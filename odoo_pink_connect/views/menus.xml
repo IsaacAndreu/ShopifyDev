@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+	<data>
+		<menuitem id="parent_pink_connect" web_icon="odoo_pink_connect,static/description/images/pink.png" name="PinkConnect" groups="base.group_user" />
+		<menuitem id="menu_pink_connect_configuration" name="PinkConnect" parent="parent_pink_connect" groups="base.group_user" sequence="1" />
+		<menuitem id="menu_pink_connect_feeds" name="Feeds" parent="parent_pink_connect" sequence="2" groups="base.group_user"/>
+		<menuitem id="menu_id_pink_connect_mappings" name="Mappings" parent="parent_pink_connect" sequence="3" groups="base.group_user"/>
+		<menuitem id="menu_id_pink_synchronization" name="Synchronization" parent="parent_pink_connect" sequence="4" groups="base.group_user"/>
+	</data>
+</odoo>

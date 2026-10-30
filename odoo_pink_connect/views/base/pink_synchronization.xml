@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<odoo>
+	<data>
+
+		<record id="pink_synchronization_tree" model="ir.ui.view">
+			<field name="name">pink_synchronization_tree</field>
+			<field name="model">pink.synchronization</field>
+			<field name="type">tree</field>
+			<field name="arch" type="xml">
+				<tree create = "false">
+					<field name="log_id" string="Log" />
+
+					<field name="pink_connect_id" />
+					<field name="create_date" />
+					<field name="action_on" />
+					<field name="action_type" />
+					<field name="status" />
+
+				</tree>
+			</field>
+		</record>
+
+		<record id="pink_synchronization_form" model="ir.ui.view">
+			<field name="name">pink_synchronization_form</field>
+			<field name="model">pink.synchronization</field>
+			<field name="type">form</field>
+			<field name="arch" type="xml">
+				<form create = "false">
+					<sheet>
+						<group col="4">
+							<field name="log_id" string="Log"/>
+							<field name="pink_connect_id" />
+							<field name="create_date" />
+							<field name="action_on" />
+							<field name="action_type" />
+						</group>
+						<group>
+							<field name="status" />
+							<field name="summary" widget='html' />
+						</group>
+					</sheet>
+				</form>
+			</field>
+		</record>
+
+		<record id="pink_synchronization_action_id" model="ir.actions.act_window">
+			<field name="name">Logs</field>
+			<field name="res_model">pink.synchronization</field>
+			<field name="view_mode">tree,form</field>
+		</record>
+
+
+		<menuitem id="pink_sync_sub_menu_id" name="Logs" parent="menu_id_pink_synchronization" action="pink_synchronization_action_id" />
+	</data>
+</odoo>

@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<odoo>
+	<data noupdate="0">
+		<record id="cron_pink_connect_import_order" forcecreate="True" model="ir.cron">
+			<field name="name">Import - Pink Connect Orders</field>
+			<field name="active" eval="False" />
+			<field name="user_id" ref="base.user_root" />
+			<field name="interval_number">4</field>
+			<field name="interval_type">hours</field>
+			<field name="numbercall">-1</field>
+			<field name="model_id" ref="model_pink_connect_channel_configuration" />
+			<field name="state">code</field>
+			<field name="code">model.import_orders_cron()</field>
+		</record>
+
+<!--		<record id="cron_pink_connect_accept_order" forcecreate="True" model="ir.cron">-->
+<!--			<field name="name">Accept - Pink Connect Orders</field>-->
+<!--			<field name="active" eval="False" />-->
+<!--			<field name="user_id" ref="base.user_root" />-->
+<!--			<field name="interval_number">4</field>-->
+<!--			<field name="interval_type">hours</field>-->
+<!--			<field name="numbercall">-1</field>-->
+<!--			<field name="model_id" ref="model_pink_connect_channel_configuration" />-->
+<!--			<field name="state">code</field>-->
+<!--			<field name="code">model.accept_orders_cron()</field>-->
+<!--		</record>-->
+
+		<record id="cron_pink_connect_evaluate_order" forcecreate="True" model="ir.cron">
+			<field name="name">Evaluate Pink Connect Orders</field>
+			<field name="active" eval="False" />
+			<field name="user_id" ref="base.user_root" />
+			<field name="interval_number">4</field>
+			<field name="interval_type">hours</field>
+			<field name="numbercall">-1</field>
+			<field name="model_id" ref="model_pink_connect_channel_configuration" />
+			<field name="state">code</field>
+			<field name="code">model.evaluate_orders_cron()</field>
+		</record>
+
+		<record id="cron_pink_connect_sync_stock" forcecreate="True" model="ir.cron">
+			<field name="name">Sync Pink Connect Stock</field>
+			<field name="active" eval="False" />
+			<field name="user_id" ref="base.user_root" />
+			<field name="interval_number">4</field>
+			<field name="interval_type">hours</field>
+			<field name="numbercall">-1</field>
+			<field name="model_id" ref="model_pink_connect_channel_configuration" />
+			<field name="state">code</field>
+			<field name="code">model.sync_stock_cron()</field>
+		</record>
+
+		<record id="cron_pink_connect_send_shipment" forcecreate="True" model="ir.cron">
+			<field name="name">Pink Connect Send Shipment cron</field>
+			<field name="active" eval="False" />
+			<field name="user_id" ref="base.user_root" />
+			<field name="interval_number">4</field>
+			<field name="interval_type">hours</field>
+			<field name="numbercall">-1</field>
+			<field name="model_id" ref="model_pink_connect_channel_configuration" />
+			<field name="state">code</field>
+			<field name="code">model.pink_send_shipment_cron()</field>
+		</record>
+
+<!--	MODIFIED BY XAVI BRAVO 2: add auto_invoice cron	-->
+		<record id="cron_pink_connect_auto_invoice" forcecreate="True" model="ir.cron">
+			<field name="name">Pink Connect Auto Invoice cron</field>
+			<field name="active" eval="True" />
+			<field name="user_id" ref="base.user_root" />
+			<field name="interval_number">4</field>
+			<field name="interval_type">hours</field>
+			<field name="numbercall">-1</field>
+			<field name="model_id" ref="model_pink_connect_channel_configuration" />
+			<field name="state">code</field>
+			<field name="code">model.cron_auto_invoicing()</field>
+		</record>
+
+    </data>
+</odoo>

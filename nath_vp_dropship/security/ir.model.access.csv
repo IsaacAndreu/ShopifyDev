@@ -1,0 +1,12 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_vp_config_user,vp.dropship.config user,model_vp_dropship_config,sales_team.group_sale_salesman,1,0,0,0
+access_vp_config_manager,vp.dropship.config manager,model_vp_dropship_config,group_vp_dropship_manager,1,1,1,1
+access_vp_carrier_user,vp.dropship.carrier user,model_vp_dropship_carrier,sales_team.group_sale_salesman,1,0,0,0
+access_vp_carrier_manager,vp.dropship.carrier manager,model_vp_dropship_carrier,group_vp_dropship_manager,1,1,1,1
+access_vp_price_user,vp.dropship.price user,model_vp_dropship_price,sales_team.group_sale_salesman,1,0,0,0
+access_vp_price_manager,vp.dropship.price manager,model_vp_dropship_price,group_vp_dropship_manager,1,1,1,1
+access_vp_batch_user,vp.dropship.batch user,model_vp_dropship_batch,sales_team.group_sale_salesman,1,1,1,0
+access_vp_batch_manager,vp.dropship.batch manager,model_vp_dropship_batch,group_vp_dropship_manager,1,1,1,1
+access_vp_order_user,vp.dropship.order user,model_vp_dropship_order,sales_team.group_sale_salesman,1,1,1,0
+access_vp_order_manager,vp.dropship.order manager,model_vp_dropship_order,group_vp_dropship_manager,1,1,1,1
+access_vp_import_manager,vp.dropship.import manager,model_vp_dropship_import,group_vp_dropship_manager,1,1,1,1

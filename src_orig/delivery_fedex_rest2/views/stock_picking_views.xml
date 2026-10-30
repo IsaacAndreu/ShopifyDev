@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_picking_form_fedex_rest_debug" model="ir.ui.view">
+        <field name="name">stock.picking.form.fedex.rest.debug</field>
+        <field name="model">stock.picking</field>
+        <field name="inherit_id" ref="stock.view_picking_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//page[@name='extra']" position="inside">
+                <group string="FedEx REST Debug Info" attrs="{'invisible': [('delivery_type', '!=', 'fedex_rest')]}">
+                    <field name="fedex_rest_last_request" widget="text"/>
+                    <field name="fedex_rest_last_response" widget="text"/>
+                    <field name="fedex_rest_shipment_state"/>
+                    <field name="fedex_rest_send_request_id"/>
+                    <field name="fedex_rest_transaction_id"/>
+                    <field name="fedex_rest_request_hash"/>
+                    <field name="fedex_rest_piece_tracking_numbers" widget="text"/>
+                    <field name="fedex_rest_shipment_created_at"/>
+                    <field name="fedex_rest_last_error" widget="text"/>
+                    <button name="action_fedex_reset_shipment_guard"
+                            type="object"
+                            string="Desbloquear expedición FedEx"
+                            class="oe_link"
+                            groups="stock.group_stock_manager"
+                            attrs="{'invisible': ['|', ('delivery_type', '!=', 'fedex_rest'), ('carrier_tracking_ref', '!=', False)]}"
+                            confirm="Confirma que FedEx no ha creado ninguna expedición antes de desbloquear este picking?"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+</odoo>

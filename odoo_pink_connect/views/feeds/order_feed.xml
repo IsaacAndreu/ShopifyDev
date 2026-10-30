@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<odoo>
+    <data>
+
+
+        <record id="pink_connect_order_feed_view_form" model="ir.ui.view">
+            <field name="name">pink.connect.order.feed.form</field>
+            <field name="model">pink.connect.order.feed</field>
+            <field name="type">form</field>
+            <field name="arch" type="xml">
+                <form create="false">
+                    <header>
+<!--                         <button name="create_order_mappings" type="object" string="Evaluate" class="oe_highlight" />-->
+                        <field name="state" widget="statusbar"/>
+                    </header>
+                    <sheet>
+
+                        <group name="primary_info">
+                            <group>
+                                <!-- <field name="state" /> -->
+                                <field name="pink_connect_id" readonly="1" string="Pink Connect"/>
+                                <field name="order_id" readonly="1" string='Order No.'/>
+                                <field name="market_place_name" readonly="1" string="Market Place"/>
+                                <field name="market_place_code" readonly="1" string='Code'/>
+                                <field name="market_place_order_code" readonly="1" string='Market Place Order Code'/>
+                                <field name="shop_channel_id" readonly="1" string='Shop Channel ID'/>
+                                <field name="shop_channel_name" readonly="1" string='Shop Channel Name'/>
+
+                                <br></br>
+
+                                <field name="create_order_date" readonly="1"/>
+                                <field name="total_price" readonly="1"/>
+                                <field name="shipping_cost" string="Shipping Cost" readonly="1"/>
+                                <field name="currency" String="Currency" readonly="1"/>
+
+                            </group>
+
+                            <group>
+                                <field name="customer_id"/>
+                                <field name="company_id"/>
+                            </group>
+
+                        </group>
+
+                        <notebook name='informations'>
+                            <page name='line_info' string='Order Lines'>
+
+                                <field name="order_line_ids" readonly="1">
+
+                                    <tree editable="bottom">
+                                        <field name="sku" string='Product SKU'/>
+                                        <field name="product_name" string="Name"/>
+                                        <field name="gtin" optional="show" string='GTIN'/>
+
+
+                                        <field name="quantity"/>
+                                        <field name="price"/>
+                                        <field name="tax_rate" string="Tax" optional="hide"/>
+                                        <field name="brand_name"/>
+                                        <field name="total_price"/>
+                                        <field name="process_state" invisible="1"/>
+                                        <field name="stock_state" invisible="1"/>
+                                        <field name="company_id" invisible="1"/>
+
+                                    </tree>
+                                </field>
+
+                            </page>
+
+                            <page name='address_info' string='Address'>
+                                <group></group>
+
+                                <!-- <group string='Billing Address'>
+                                    <group>
+                                        <field name="billing_firstname" />
+                                        <field name="billing_lastname" />
+                                        <field name="billing_email" />
+                                        <field name="billing_phone" />
+                                        <field name="billing_mobile" />
+
+
+                                    </group>
+                                    <group>
+                                        <field name="billing_street_1" />
+                                        <field name="billing_street_2" />
+                                        <field name="billing_city" />
+                                        <field name="billing_zip_code" />
+
+                                        <field name="billing_state" />
+                                        <field name="billing_country" />
+                                        <field name="billing_country_iso_code" />
+
+
+                                    </group>
+                                </group> -->
+                                <group string='Shipping Address'>
+                                    <group>
+                                        <field name="shipping_name"/>
+                                        <field name="shipping_email"/>
+                                        <field name="shipping_phone"/>
+                                        <field name="shipping_address"/>
+
+                                    </group>
+                                    <group>
+                                        <field name="shipping_city"/>
+                                        <field name="shipping_zip_code"/>
+                                        <field name="shipping_state"/>
+                                        <field name="shipping_country"/>
+                                        <field name="shipping_country_iso_code"/>
+                                    </group>
+                                </group>
+                            </page>
+
+                            <page name="delivery_details" string="Delivery Details">
+                                <group>
+                                    <field name="carrier_id"/>
+                                        <field name="carrier_name"/>
+                                        <field name="tracking_number"/>
+                                        <field name="tracking_url"/>
+                                </group>
+                            </page>
+
+                            <page name="mapping" string="Mapping">
+                                <group>
+                                    <field name="order_mapping_id"/>
+                                    <field name="sale_order_id"/>
+                                </group>
+                            </page>
+
+                            <page string="Operation Log">
+								<group>
+									<field readonly='1' name="log_message"  />
+								</group>
+							</page>
+
+                        </notebook>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <record id="pink_connect_order_feed_view_tree" model="ir.ui.view">
+            <field name="name">pink.connect.order.feed.tree</field>
+            <field name="model">pink.connect.order.feed</field>
+            <field name="type">tree</field>
+            <field name="arch" type="xml">
+                <tree create="false">
+                    <field name="create_order_date"/>
+                    <field name="pink_connect_id"/>
+                    <field name="order_id" string='Order #'/>
+                    <field name="state"/>
+                    <field name="company_id"/>
+                </tree>
+            </field>
+        </record>
+
+        <record id="action_pink_connect_order_feed" model="ir.actions.act_window">
+            <field name="name">Order Feeds</field>
+            <field name="res_model">pink.connect.order.feed</field>
+            <field name="view_mode">tree,form</field>
+        </record>
+        <!-- sub menu -->
+
+        <menuitem id="pink_connect_order_feeds_menu_id" name="Order" parent="menu_pink_connect_feeds"
+                  action="action_pink_connect_order_feed" sequence="4"/>
+    </data>
+</odoo>

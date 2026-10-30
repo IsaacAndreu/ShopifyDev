@@ -1,0 +1,43 @@
+<odoo>
+    <record id="config_tree" model="ir.ui.view">
+        <field name="name">vp.return.config.tree</field><field name="model">vp.return.config</field>
+        <field name="arch" type="xml"><tree><field name="name"/><field name="connection_id"/><field name="company_id"/><field name="last_read"/></tree></field>
+    </record>
+    <record id="config_form" model="ir.ui.view">
+        <field name="name">vp.return.config.form</field><field name="model">vp.return.config</field>
+        <field name="arch" type="xml">
+            <form><header>
+                <button name="action_read" type="object" string="Leer API (solo lectura)" class="oe_highlight"/>
+                <button name="action_import_response" type="object" string="Importar última respuesta"/>
+                <button name="action_import_sample" type="object" string="Importar ejemplo local"/>
+            </header><sheet>
+                <div class="alert alert-info">Piloto 0.1: lectura y previsualización. No crea TT/DEV, transporte, mensajes ni cambios de estado en VP. Máximo 50 solicitudes de un pedido por lectura.</div>
+                <group><field name="name"/><field name="connection_id"/><field name="company_id"/><field name="order_id_filter"/><field name="last_read"/></group>
+                <notebook><page string="Respuesta API"><field name="last_response"/></page>
+                    <page string="Ejemplo local"><field name="sample_response" placeholder='[{"returnRequestId":"TEST-1","orderId":"123","status":"PENDING"}]'/></page>
+                </notebook>
+            </sheet></form>
+        </field>
+    </record>
+    <record id="request_tree" model="ir.ui.view">
+        <field name="name">vp.return.request.tree</field><field name="model">vp.return.request</field>
+        <field name="arch" type="xml"><tree create="false" delete="false"><field name="remote_id"/><field name="order_id"/><field name="remote_status"/><field name="sale_id"/><field name="simulated"/><field name="company_id"/></tree></field>
+    </record>
+    <record id="request_form" model="ir.ui.view">
+        <field name="name">vp.return.request.form</field><field name="model">vp.return.request</field>
+        <field name="arch" type="xml"><form create="false" delete="false"><header><button name="action_preview" type="object" string="Simular / previsualizar" class="oe_highlight"/></header><sheet>
+            <group><field name="config_id" readonly="1"/><field name="company_id"/><field name="remote_id"/><field name="order_id"/><field name="remote_status"/><field name="simulated"/><field name="sale_id"/></group>
+            <group string="Datos de la solicitud"><field name="order_line_id"/><field name="marketplace_return_id"/><field name="marketplace_order_number"/><field name="sku"/><field name="gtin"/><field name="return_type"/><field name="reason"/></group>
+            <notebook><page string="Previsualización"><field name="preview"/></page><page string="Datos originales"><field name="payload"/></page></notebook>
+        </sheet><div class="oe_chatter"><field name="message_follower_ids"/><field name="message_ids"/></div></form></field>
+    </record>
+    <record id="config_action" model="ir.actions.act_window"><field name="name">Configuración VP</field><field name="res_model">vp.return.config</field><field name="view_mode">tree,form</field></record>
+    <record id="request_action" model="ir.actions.act_window"><field name="name">Devoluciones VP</field><field name="res_model">vp.return.request</field><field name="view_mode">tree,form</field></record>
+    <!-- Menú comú per a totes les devolucions online. El mòdul Shopify es
+         reubica aquí i aquest pilot hi afegeix la branca VP. -->
+    <menuitem id="menu_returns_root" name="Devoluciones Online" parent="stock.menu_stock_root" sequence="25"/>
+    <record id="nath_shopify_returns.menu_shopify_returns_root" model="ir.ui.menu"><field name="name">Shopify</field><field name="parent_id" ref="menu_returns_root"/></record>
+    <menuitem id="menu_vp" name="VP / PinkConnect" parent="menu_returns_root" sequence="20" groups="group_vp_manager"/>
+    <menuitem id="menu_requests" name="Solicitudes" parent="menu_vp" action="request_action"/>
+    <menuitem id="menu_config" name="Configuración" parent="menu_vp" action="config_action" sequence="20"/>
+</odoo>

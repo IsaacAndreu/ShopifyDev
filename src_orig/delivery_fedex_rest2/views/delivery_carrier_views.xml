@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_delivery_carrier_form_fedex_rest" model="ir.ui.view">
+        <field name="name">delivery.carrier.form.fedex.rest</field>
+        <field name="model">delivery.carrier</field>
+        <field name="inherit_id" ref="delivery.view_delivery_carrier_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//page[@name='destination']" position="before">
+                <page string="FedEx REST Config" attrs="{'invisible': [('delivery_type', '!=', 'fedex_rest')]}">
+                    <group>
+                        <group string="Credenciales API">
+                            <field name="fedex_rest_api_key" attrs="{'required': [('delivery_type', '=', 'fedex_rest')]}"/>
+                            <field name="fedex_rest_secret_key" password="True" attrs="{'required': [('delivery_type', '=', 'fedex_rest')]}"/>
+                            <field name="fedex_rest_account_number" attrs="{'required': [('delivery_type', '=', 'fedex_rest')]}"/>
+                        </group>
+                        <group string="Configuración ETD">
+                            <field name="fedex_rest_image_signature_id"/>
+                            <field name="fedex_rest_image_logo_id"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Servicio">
+                            <field name="fedex_rest_service_type" attrs="{'required': [('delivery_type', '=', 'fedex_rest')]}"/>
+                        </group>
+                        <group string="Formato de Etiqueta">
+                            <field name="fedex_rest_label_format" attrs="{'required': [('delivery_type', '=', 'fedex_rest')]}"/>
+                            <field name="fedex_rest_label_stock_type" attrs="{'required': [('delivery_type', '=', 'fedex_rest')]}"/>
+                        </group>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

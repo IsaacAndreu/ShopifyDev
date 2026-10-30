@@ -1,0 +1,7 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_shopify_return_log_user,shopify.return.log user,model_shopify_return_log,stock.group_stock_user,1,1,1,0
+access_shopify_return_log_line_user,shopify.return.log.line user,model_shopify_return_log_line,stock.group_stock_user,1,1,1,1
+access_shopify_return_config_user,shopify.return.config user,model_shopify_return_config,stock.group_stock_user,1,0,0,0
+access_shopify_return_config_manager,shopify.return.config manager,model_shopify_return_config,stock.group_stock_manager,1,1,1,1
+access_shopify_return_test_wizard_user,shopify.return.test.wizard user,model_shopify_return_test_wizard,stock.group_stock_user,1,1,1,1
+access_shopify_return_close_wizard_user,shopify.return.close.wizard user,model_shopify_return_close_wizard,stock.group_stock_user,1,1,1,1

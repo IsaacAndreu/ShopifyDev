@@ -1,0 +1,44 @@
+<odoo>
+    <record id="plan_tree" model="ir.ui.view">
+        <field name="name">nath.exchange.plan.tree</field><field name="model">nath.exchange.plan</field>
+        <field name="arch" type="xml"><tree><field name="name"/><field name="sale_id"/><field name="partner_id"/><field name="company_id"/><field name="state"/></tree></field>
+    </record>
+    <record id="plan_form" model="ir.ui.view">
+        <field name="name">nath.exchange.plan.form</field><field name="model">nath.exchange.plan</field>
+        <field name="arch" type="xml"><form delete="false"><header>
+            <button name="action_prepare" type="object" string="Preparar movimientos y proteger pedido" states="draft" class="oe_highlight"/>
+            <button name="action_preview" type="object" string="Previsualizar" states="prepared"/>
+            <button name="action_create_drafts" type="object" string="Crear borradores pendientes" states="prepared" class="oe_highlight"/>
+            <button name="action_open_documents" type="object" string="Ver documentos"/>
+            <field name="state" widget="statusbar"/>
+        </header><sheet>
+            <div class="alert alert-warning">Piloto para demo. No modifica movimientos ni tallas históricas. Crea documentos en borrador; no valida, concilia ni reembolsa Shopify. Incluye solo devoluciones y salidas del cambio, excluyendo la salida original ya facturada. Al preparar, bloquea la facturación ordinaria del pedido vinculado.</div>
+            <group><group>
+                <field name="name" attrs="{'readonly':[('state','!=','draft')]}"/>
+                <field name="company_id" attrs="{'readonly':[('state','!=','draft')]}"/>
+                <field name="sale_id" domain="[('company_id','=',company_id)]" attrs="{'readonly':[('state','!=','draft')]}"/>
+                <field name="partner_id" attrs="{'readonly':[('state','!=','draft')]}"/>
+            </group><group>
+                <field name="currency_id" attrs="{'readonly':[('state','!=','draft')]}"/>
+                <field name="journal_id" attrs="{'readonly':[('state','!=','draft')]}"/>
+                <field name="original_invoice_id" attrs="{'readonly':[('state','!=','draft')]}"/>
+            </group></group>
+            <field name="picking_ids" widget="many2many_tags" attrs="{'readonly':[('state','!=','draft')]}"/>
+            <notebook><page string="Cobertura y precios">
+                <div class="alert alert-info">Precio neto por unidad del movimiento: incluir los descuentos del artículo, también los que estén en líneas separadas. Para documentos ya creados, seleccionar la línea contable existente. El piloto exige cobertura exacta de un movimiento por línea.</div>
+                <field name="line_ids" attrs="{'readonly':[('state','=','done')]}"><tree editable="bottom" create="false" delete="false">
+                    <field name="stock_move_id" readonly="1"/><field name="product_id"/>
+                    <field name="kind" readonly="1"/><field name="quantity" readonly="1"/>
+                    <field name="existing_candidates"/><field name="existing_line_id"/>
+                    <field name="price_unit"/><field name="account_id" domain="[('company_id','=',parent.company_id),('deprecated','=',False)]"/>
+                    <field name="tax_ids" widget="many2many_tags" domain="[('company_id','=',parent.company_id),('type_tax_use','=','sale')]"/>
+                </tree></field>
+            </page><page string="Previsualización"><field name="preview"/>
+                <field name="document_inventory"/>
+                <field name="checked" attrs="{'readonly':[('state','!=','prepared')]}"/>
+            </page><page string="Borradores generados"><field name="invoice_ids" readonly="1"/></page></notebook>
+        </sheet><div class="oe_chatter"><field name="message_follower_ids"/><field name="message_ids"/></div></form></field>
+    </record>
+    <record id="plan_action" model="ir.actions.act_window"><field name="name">Cambios y salidas manuales</field><field name="res_model">nath.exchange.plan</field><field name="view_mode">tree,form</field></record>
+    <menuitem id="menu_exchange_billing" name="Cambios y salidas manuales" parent="nath_shopify_returns.menu_shopify_returns_root" action="plan_action" sequence="30" groups="group_exchange_billing"/>
+</odoo>

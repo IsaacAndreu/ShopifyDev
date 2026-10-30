@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<odoo>
+	<data>
+<!--		<record id="view_partner_form_pink_extend" model="ir.ui.view">-->
+<!--			<field name="name">pink.connect.res.partner</field>-->
+<!--			<field name="model">res.partner</field>-->
+<!--			<field name="inherit_id" ref="base.view_partner_form" />-->
+<!--			<field name="arch" type="xml">-->
+<!--				<field name="vat" position="before">-->
+<!--					<field name="pink_connect_customer_id" />-->
+<!--				</field>-->
+<!--			</field>-->
+<!--		</record>-->
+	</data>
+</odoo>

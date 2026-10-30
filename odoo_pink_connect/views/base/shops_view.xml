@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<odoo>
+	<data>
+
+        <record id="pink_connect_shops_form" model="ir.ui.view">
+            <field name="name">pink.connect.shops.from</field>
+            <field name="model">pink.connect.shops</field>
+            <field name="type">form</field>
+            <field name="arch" type="xml">
+                <form string="Shops Configuration">
+                    <sheet>
+                        <group name="">
+                            <field name="is_active" string="Is Active"/>
+                            <field name="name" string="Name"/>
+							<field name="shop_id" string="Shop/Store Id" />
+							<field name="default_partner" string="Default Partner"/>
+							<field name="code" string="Code"/>
+							<field name="country" string="Country"/>
+                            <field name="url" string="Url"/>
+                            <field name="store_tax" string="Tax Rate"/>
+                            <field name="pricelist_name" />
+                        </group>
+
+                    </sheet>
+
+                </form>
+            </field>
+        </record>
+
+
+        <record id="pink_connect_shops_tree" model="ir.ui.view">
+            <field name="name">pink.connect.shops.tree</field>
+            <field name="model">pink.connect.shops</field>
+            <field name="type">tree</field>
+            <field name="arch" type="xml">
+                <tree string="Shops">
+                    <field name="is_active" string="Is Active"/>
+                            <field name="name" string="Name"/>
+							<field name="shop_id" string="Shop/Store Id" />
+							<field name="default_partner" string="Default Partner"/>
+							<field name="code" string="Code"/>
+							<field name="country" string="Country"/>
+                </tree>
+            </field>
+        </record>
+
+
+        <record id="action_pink_connect_shops" model="ir.actions.act_window">
+            <field name="name">Shops</field>
+            <field name="res_model">pink.connect.shops</field>
+            <field name="view_mode">tree,form</field>
+        </record>
+
+        <menuitem id="sub_menu_id_pink_connect_shops" name="Shops"
+        parent="parent_pink_connect" action="action_pink_connect_shops" sequence="6"/>
+
+
+
+	</data>
+</odoo>

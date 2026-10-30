@@ -1,0 +1,41 @@
+% if object.country_code == 'PT':
+<div style="font-family: Arial, sans-serif; font-size: 14px; color: #333;">
+    <p>Olá ${object.partner_name or ''},</p>
+    <p>A devolução da tua encomenda <strong>${object.remarks}</strong> foi aprovada. Em anexo enviamos a etiqueta de devolução NACEX.</p>
+    <p><strong>Passos para fazer a devolução:</strong></p>
+    <ol>
+        <li>Coloca os artigos na embalagem original (ou semelhante) e fecha bem o pacote.</li>
+        <li>Imprime a etiqueta em anexo.</li>
+        <li>Cola a etiqueta num local visível no exterior da embalagem.</li>
+        <li>Entrega o pacote no ponto NACEX.shop mais próximo.</li>
+    </ol>
+    <p style="margin: 20px 0;">
+        <a href="https://www.nacex.es/irCerca.do" style="background: #ff5100; color: #fff; padding: 10px 18px; text-decoration: none; border-radius: 4px;">Procurar ponto NACEX.shop</a>
+    </p>
+    % if object.nacex_tracking_url:
+    <p>Podes seguir a tua devolução <a href="${object.nacex_tracking_url}">aqui</a>.</p>
+    % endif
+    <p>Guarda o comprovativo que te derem no ponto NACEX.shop.</p>
+    <p>Muito obrigado,<br/>TUC TUC</p>
+</div>
+% else:
+<div style="font-family: Arial, sans-serif; font-size: 14px; color: #333;">
+    <p>Hola ${object.partner_name or ''},</p>
+    <p>Hemos aprobado la devolución de tu pedido <strong>${object.remarks}</strong>. Te adjuntamos la etiqueta de devolución de NACEX.</p>
+    <p><strong>Pasos para hacer tu devolución:</strong></p>
+    <ol>
+        <li>Introduce los artículos en el embalaje original (o similar) y cierra bien el paquete.</li>
+        <li>Imprime la etiqueta adjunta.</li>
+        <li>Pega la etiqueta en un lugar visible en el exterior del paquete.</li>
+        <li>Entrega el paquete en tu punto NACEX.shop más cercano.</li>
+    </ol>
+    <p style="margin: 20px 0;">
+        <a href="https://www.nacex.es/irCerca.do" style="background: #ff5100; color: #fff; padding: 10px 18px; text-decoration: none; border-radius: 4px;">Buscar punto NACEX.shop</a>
+    </p>
+    % if object.nacex_tracking_url:
+    <p>Puedes seguir tu devolución <a href="${object.nacex_tracking_url}">aquí</a>.</p>
+    % endif
+    <p>Guarda el comprobante que te den en el punto NACEX.shop.</p>
+    <p>Muchas gracias,<br/>TUC TUC</p>
+</div>
+% endif

@@ -1,0 +1,20 @@
+<odoo>
+	<data>
+		<record id="pink_connect_product_form_view" model="ir.ui.view">
+			<field name="name">pink.connect.product.form.view</field>
+			<field name="model">product.product</field>
+			<field name="inherit_id" ref="product.product_normal_form_view"/>
+			<field name="arch" type="xml">
+				<xpath expr="//notebook" position="inside">
+					<page name="pink_connect" string="Pink Connect Mappings">
+						<group  name="mapping" string="Mappings">
+							<field name="pink_connect_channel_mapping" force_save="1" readonly="1"/>
+							<field name="sync_with_pink" force_save="1" readonly="1"/>
+							<field name="pink_connect_sku" force_save="1" readonly="1"/>
+						</group>
+					</page>
+				</xpath>
+			</field>
+		</record>
+	</data>
+</odoo>

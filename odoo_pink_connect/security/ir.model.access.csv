@@ -1,0 +1,17 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+
+access_user_pink_connect_channel_configuration,pink.connect.channel.conf,model_pink_connect_channel_configuration,odoo_pink_connect.group_pink_connect_user,1,1,1,0
+access_admin_pink_connect_channel_configuration,pink.connect.channel.conf,model_pink_connect_channel_configuration,odoo_pink_connect.group_pink_connect_admin,1,1,1,1
+
+
+access_user_pink_connect_order_feed,pink.connect.order.feed,model_pink_connect_order_feed,odoo_pink_connect.group_pink_connect_user,1,1,1,0
+access_admin_pink_connect_order_feed,pink.connect.order.feed,model_pink_connect_order_feed,odoo_pink_connect.group_pink_connect_admin,1,1,1,1
+
+access_user_pink_connect_order_line,pink.connect.order.line,model_pink_connect_order_line,odoo_pink_connect.group_pink_connect_user,1,1,1,0
+access_admin_pink_connect_order_line,pink.connect.order.line,model_pink_connect_order_line,odoo_pink_connect.group_pink_connect_admin,1,1,1,1
+
+access_user_pink_connect_order_mapping,pink.connect.order.mapping,model_pink_connect_order_mapping,odoo_pink_connect.group_pink_connect_user,1,1,1,0
+access_admin_pink_connect_order_mapping,pink.connect.order.mapping,model_pink_connect_order_mapping,odoo_pink_connect.group_pink_connect_admin,1,1,1,1
+
+access_user_pink_connect_sync_log,pink.synchronization,model_pink_synchronization,odoo_pink_connect.group_pink_connect_user,1,1,1,0
+access_admin_pink_connect_sync_log,pink.synchronization,model_pink_synchronization,odoo_pink_connect.group_pink_connect_admin,1,1,1,1

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_vp_dropship_import_form" model="ir.ui.view">
+        <field name="name">vp.dropship.import.form</field>
+        <field name="model">vp.dropship.import</field>
+        <field name="arch" type="xml">
+            <form>
+                <group attrs="{'invisible': [('result', '!=', False)]}">
+                    <field name="config_id"/>
+                    <field name="kind" widget="radio"/>
+                    <field name="campaign" attrs="{'invisible': [('kind', '=', 'carriers')]}"/>
+                    <field name="replace" attrs="{'invisible': [('kind', '!=', 'prices')]}"/>
+                    <field name="file" filename="filename"/>
+                    <field name="filename" invisible="1"/>
+                </group>
+                <field name="result" attrs="{'invisible': [('result', '=', False)]}"/>
+                <footer>
+                    <button name="action_import" type="object" string="Importar" class="btn-primary"
+                            attrs="{'invisible': [('result', '!=', False)]}"/>
+                    <button special="cancel" string="Cerrar"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_vp_dropship_import" model="ir.actions.act_window">
+        <field name="name">Importar Excel (Veepee DP)</field>
+        <field name="res_model">vp.dropship.import</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<odoo>
+    <data>
+
+        <record id="pink_connect_channel_configuration_form" model="ir.ui.view">
+            <field name="name">pink.connect.channel.configuration.from</field>
+            <field name="model">pink.connect.channel.configuration</field>
+            <field name="type">form</field>
+            <field name="arch" type="xml">
+                <form string="Pink Connect Configuration">
+                    <header>
+                        <button name="confirm" string="Confirm" type="object" class="oe_highlight"
+                                attrs="{'invisible':[('state','in',['validate'])]}"/>
+                        <button name="set_to_draft" string="Set to Draft" title="Set to Draft" type="object"
+                                class="oe_highlight" attrs="{'invisible':[('state','not in',['validate'])]}"/>
+                        <field name="state" widget="statusbar"/>
+                    </header>
+                    <sheet>
+
+                        <field name="image" class="oe_avatar" widget="image"/>
+                        <div class="oe_title">
+                            <b>
+                                <label for="name" string="Name"/>
+                            </b>
+                            <h1>
+                                <field name="name" placeholder="Name"/>
+                            </h1>
+                            <b>
+                                <label for="company_id" string="Company"/>
+                            </b>
+                            <h4>
+                                <field name="company_id" placeholder="Company"/>
+                            </h4>
+                        </div>
+                        <notebook>
+                            <page name="Operation" string="Operation">
+<!--                                <group name="operation_button_group">-->
+
+<!--                                    <button name="button_wizard" type="object" class="oe_highlight">-->
+<!--                                        <span>Import Orders for Process</span>-->
+<!--                                        <span>-->
+<!--                                            <i class="fa fa-fw fa-cloud-download"/>-->
+<!--                                        </span>-->
+<!--                                    </button>-->
+
+<!--                                    <button name="stock_sync" type="object" class="oe_highlight">-->
+<!--                                        <span>sync orders</span>-->
+<!--                                        <span>-->
+<!--                                            <i class="bi bi-arrow-repeat"/>-->
+<!--                                        </span>-->
+<!--                                    </button>-->
+
+<!--                                </group>-->
+                                <group>
+                                    <field name="import_order_status"/>
+                                </group>
+
+                            </page>
+
+
+                            <page name="credentials" string="Credentials">
+                                <group string="Pink Connect Credentials" name="credentials">
+                                    <group name="core_credentials">
+                                        <field name="url" placeholder="https://brainstation-23.com/"/>
+                                        <field name="api_key"/>
+                                    </group>
+
+                                </group>
+                                <group string="Advanced Configurations" name="api_info">
+                                    <group>
+                                        <field name="api_record_limit" required="1"/>
+                                    </group>
+                                </group>
+                            </page>
+
+                            <page name="configuration" string="Sale Order Defaults">
+                                <group name="basic_configuration">
+                                    <group string='Sale Order Defaults'>
+
+                                        <field name="sale_order_type" force_save="1"/>
+                                        <field name="season_id" string='Season' required='1'/>
+                                        <field name="brand_id" required='1'/>
+
+                                    </group>
+
+                                    <group string='Customer Defaults'>
+                                        <field name="bb_type" required='1'/>
+<!--                                        <field name="category_id"/>-->
+                                        <field name="country_id"/>
+                                        <field name="sale_journal"/>
+                                        <field name="property_account_receivable_id"/>
+                                    </group>
+                                </group>
+<!--	MODIFIED BY XAVI BRAVO 2: change order and add extra fields	-->
+                                <group>
+                                    <group string='Pricing and tax'>
+                                        <field name="tax_name" />
+                                        <field name="pricelist_name" />
+                                        <field name="payment_term_id" />
+                                        <field name="payment_mode_id" />
+                                        <field name="fiscal_position_id" />
+                                        <field name="auto_invoicing" />
+                                    </group>
+
+                                     <group string='Products'>
+                                        <field name="delivery_product_id" required='1'/>
+                                    </group>
+                                </group>
+
+
+                                <group string='Warehouse and Stock'>
+                                    <field name="pink_threshold_qty"/>
+                                    <field name="warehouse_id" required="1"/>
+                                    <field name="location_id" widget="many2many_tags"/>
+                                    <button name="compute_stock_locations" string="Update" type="object"
+                                        class="oe_highlight"/>
+                                    <field name="location_updated"/>
+                                    <field name="impacting_location_ids" force_save="1" invisible="0"
+                                        widget="many2many_tags"/>
+                                </group>
+                            </page>
+<!--                            <page name="shop" string="Shops Info">-->
+<!--                                <group string="Pink Connect Shops" name="shop">-->
+<!--                                    <group name="shop">-->
+<!--                                        <field name="shop_ids"/>-->
+<!--                                    </group>-->
+<!--                                </group>-->
+<!--                            </page>-->
+
+                        </notebook>
+                    </sheet>
+                    <div class="oe_chatter">
+                        <field name="message_follower_ids" widget="mail_followers"/>
+                        <field name="activity_ids" widget="mail_activity"/>
+                        <field name="message_ids" widget="mail_thread"/>
+                    </div>
+                </form>
+            </field>
+        </record>
+
+        <record id="pink_connect_channel_configuration_tree" model="ir.ui.view">
+            <field name="name">pink.connect.channel.configuration.tree</field>
+            <field name="model">pink.connect.channel.configuration</field>
+            <field name="type">tree</field>
+            <field name="arch" type="xml">
+                <tree string="Configuration">
+                    <field name="name"/>
+                    <field name="company_id"/>
+                    <field name="state"/>
+                </tree>
+            </field>
+        </record>
+
+
+        <record id="action_pink_connect_configuration" model="ir.actions.act_window">
+            <field name="name">Pink Connect Configuration</field>
+            <field name="res_model">pink.connect.channel.configuration</field>
+            <field name="view_mode">tree,form</field>
+        </record>
+        <!-- sub menu -->
+
+        <menuitem id="sub_menu_pink_connect_configuration" name="Configurations"
+                  parent="menu_pink_connect_configuration" action="action_pink_connect_configuration" sequence="2"/>
+    </data>
+</odoo>

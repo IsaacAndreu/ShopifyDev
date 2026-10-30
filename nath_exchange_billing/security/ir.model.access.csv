@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+exchange_plan_manager,exchange plan reviewer,model_nath_exchange_plan,group_exchange_billing,1,1,1,0
+exchange_line_manager,exchange line reviewer,model_nath_exchange_line,group_exchange_billing,1,1,1,0

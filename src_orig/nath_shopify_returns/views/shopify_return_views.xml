@@ -1,0 +1,379 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ============ LOG ============ -->
+    <record id="view_shopify_return_log_tree" model="ir.ui.view">
+        <field name="name">shopify.return.log.tree</field>
+        <field name="model">shopify.return.log</field>
+        <field name="arch" type="xml">
+            <tree decoration-info="state == 'received'"
+                  decoration-success="state in ('refunded', 'closed')"
+                  decoration-warning="issue == 'review'"
+                  decoration-danger="issue == 'error'"
+                  decoration-muted="state == 'cancel'"
+                  decoration-bf="overdue">
+                <field name="overdue" invisible="1"/>
+                <field name="create_date" string="Fecha"/>
+                <field name="remarks"/>
+                <field name="partner_name"/>
+                <field name="dev_picking_id"/>
+                <field name="return_carrier"/>
+                <field name="country_code"/>
+                <field name="nacex_albaran"/>
+                <field name="carrier_status" optional="show"/>
+                <field name="approved_date"/>
+                <field name="days_waiting" attrs="{'invisible': [('state', '!=', 'done')]}"/>
+                <field name="received_date"/>
+                <field name="amount_to_refund" sum="Total"/>
+                <field name="shopify_refunded_total" sum="Total"/>
+                <field name="state"/>
+                <field name="issue"/>
+                <field name="error_msg"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_shopify_return_log_form" model="ir.ui.view">
+        <field name="name">shopify.return.log.form</field>
+        <field name="model">shopify.return.log</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_process" type="object" string="Procesar" class="btn-primary"
+                            attrs="{'invisible': ['|', ('state', 'in', ('done', 'received', 'refunded', 'cancel')), ('issue', '!=', 'none')]}"/>
+                    <button name="action_retry" type="object" string="Reintentar"
+                            attrs="{'invisible': ['|', ('state', 'in', ('done', 'received', 'refunded', 'cancel')), ('issue', '=', 'none')]}"/>
+                    <button name="action_accept" type="object" string="Aceptar y reembolsar" class="btn-primary"
+                            attrs="{'invisible': [('state', '!=', 'received')]}"
+                            confirm="Se creará la rectificativa y se hará el reembolso en Shopify de las unidades recibidas. ¿Continuar?"/>
+                    <button name="action_close_manual" type="object" string="Cerrar (hecho a mano)"
+                            attrs="{'invisible': [('state', '!=', 'received')]}"
+                            confirm="¿Has hecho la rectificativa y el reembolso a mano? Se enlazará la rectificativa del pedido y la devolución quedará cerrada."/>
+                    <button name="action_open_shopify" type="object" string="Abrir en Shopify"
+                            attrs="{'invisible': [('shopify_admin_url', '=', False)]}"/>
+                    <button name="action_update_tracking" type="object" string="Actualizar estado del envío"
+                            attrs="{'invisible': ['|', ('state', '!=', 'done'), ('nacex_albaran', '=', False)]}"/>
+                    <button name="action_open_nacex" type="object" string="Seguimiento"
+                            attrs="{'invisible': [('nacex_tracking_url', '=', False)]}"/>
+                    <button name="action_cancel" type="object" string="Cancelar"
+                            attrs="{'invisible': [('state', 'in', ('received', 'refunded', 'closed', 'cancel'))]}"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="pending,validated,dev_created,nacex_ok,done,received,closed"/>
+                </header>
+                <sheet>
+                    <div class="alert alert-warning" role="alert"
+                         attrs="{'invisible': [('issue', '=', 'none')]}">
+                        <field name="issue" readonly="1"/>: <field name="error_msg"/>
+                    </div>
+                    <div class="alert alert-info" role="alert"
+                         attrs="{'invisible': [('incident_note', '=', False)]}">
+                        <strong>Nota del almacén:</strong> <field name="incident_note"/>
+                    </div>
+                    <div class="alert alert-danger" role="alert"
+                         attrs="{'invisible': ['|', ('overdue', '=', False), ('state', '!=', 'done')]}">
+                        <strong>Paquete retrasado:</strong> lleva <field name="days_waiting" readonly="1"/> días sin llegar.
+                    </div>
+                    <h1><field name="remarks"/></h1>
+                    <field name="shopify_admin_url" invisible="1"/>
+                    <field name="nacex_tracking_url" invisible="1"/>
+                    <group>
+                        <group string="Cliente">
+                            <field name="partner_name"/>
+                            <field name="email"/>
+                            <field name="phone"/>
+                            <field name="street"/>
+                            <field name="zip"/>
+                            <field name="city"/>
+                            <field name="country_code"/>
+                        </group>
+                        <group string="Seguimiento">
+                            <field name="config_id"/>
+                            <field name="shopify_return_name"/>
+                            <field name="sale_id"/>
+                            <field name="out_picking_id"/>
+                            <field name="dev_picking_id"/>
+                            <field name="return_carrier"/>
+                            <field name="fedex_pickup"
+                                   attrs="{'invisible': [('return_carrier', '!=', 'fedex'), ('state', '!=', 'pending')],
+                                           'readonly': [('state', 'not in', ('pending', 'validated', 'dev_created'))]}"/>
+                            <field name="fedex_dropoff_point" attrs="{'invisible': [('fedex_dropoff_point', '=', False)]}"/>
+                            <field name="nacex_return_method" invisible="1"/>
+                            <field name="nacex_shop_code"
+                                   attrs="{'invisible': ['|', ('return_carrier', '=', 'fedex'), ('nacex_return_method', '=', 'label')],
+                                           'readonly': [('state', 'not in', ('pending', 'validated', 'dev_created'))]}"/>
+                            <field name="nacex_albaran"/>
+                            <field name="nacex_cod_exp"/>
+                            <field name="carrier_status" attrs="{'invisible': [('carrier_status', '=', False)]}"/>
+                            <field name="carrier_status_date" attrs="{'invisible': [('carrier_status_date', '=', False)]}"/>
+                            <field name="carrier_delivered" attrs="{'invisible': [('carrier_delivered', '=', False)]}"/>
+                            <field name="overdue" invisible="1"/>
+                            <field name="label_attachment_id"/>
+                            <field name="refund_invoice_id"/>
+                            <field name="refund_amount"/>
+                            <field name="shopify_refunded_total"/>
+                            <field name="attempts"/>
+                        </group>
+                        <group string="Fechas">
+                            <field name="create_date" string="Detectada el"/>
+                            <field name="approved_date"/>
+                            <field name="days_waiting" attrs="{'invisible': [('approved_date', '=', False)]}"/>
+                            <field name="received_date"/>
+                            <field name="closed_date"/>
+                        </group>
+                        <group string="Importes (IVA incluido, según Shopify)">
+                            <field name="currency_code"/>
+                            <field name="amount_expected"/>
+                            <field name="amount_to_refund"/>
+                        </group>
+                    </group>
+                    <field name="line_ids">
+                        <tree editable="bottom">
+                            <field name="sku"/>
+                            <field name="product_id"/>
+                            <field name="return_reason"/>
+                            <field name="customer_note"/>
+                            <field name="unit_price"/>
+                            <field name="unit_discount"/>
+                            <field name="quantity"/>
+                            <field name="qty_received"/>
+                            <field name="qty_refund"/>
+                            <field name="amount_to_refund" sum="Total"/>
+                            <field name="refunded_subtotal" sum="Total"/>
+                        </tree>
+                    </field>
+                    <group groups="base.group_no_one">
+                        <field name="shopify_return_id"/>
+                        <field name="shopify_order_id"/>
+                    </group>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids" widget="mail_followers"/>
+                    <field name="message_ids" widget="mail_thread"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_shopify_return_log_search" model="ir.ui.view">
+        <field name="name">shopify.return.log.search</field>
+        <field name="model">shopify.return.log</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="remarks"/>
+                <field name="partner_name"/>
+                <field name="email"/>
+                <filter name="to_review" string="A revisar" domain="[('issue', '!=', 'none')]"/>
+                <filter name="to_accept" string="Recibidas: pendientes de aceptar" domain="[('state', '=', 'received')]"/>
+                <filter name="open" string="Pendientes" domain="[('state', 'not in', ('done', 'received', 'refunded', 'closed', 'cancel'))]"/>
+                <filter name="waiting" string="Esperando el paquete" domain="[('state', '=', 'done')]"/>
+                <filter name="overdue" string="Paquetes retrasados" domain="[('state', '=', 'done'), ('overdue', '=', True)]"/>
+                <filter name="delivered_not_validated" string="Entregadas sin validar la DEV"
+                        domain="[('state', '=', 'done'), ('carrier_delivered', '=', True)]"/>
+                <filter name="done" string="Cerradas / reembolsadas" domain="[('state', 'in', ('refunded', 'closed'))]"/>
+                <filter name="nacex" string="Nacex" domain="[('return_carrier', '=', 'nacex')]"/>
+                <filter name="fedex" string="FedEx" domain="[('return_carrier', '=', 'fedex')]"/>
+                <group expand="0" string="Agrupar por">
+                    <filter name="group_carrier" string="Transportista" context="{'group_by': 'return_carrier'}"/>
+                    <filter name="group_state" string="Estado" context="{'group_by': 'state'}"/>
+                    <filter name="group_config" string="Tienda" context="{'group_by': 'config_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_shopify_return_log" model="ir.actions.act_window">
+        <field name="name">Devoluciones Shopify</field>
+        <field name="res_model">shopify.return.log</field>
+        <field name="view_mode">tree,form</field>
+        <field name="context">{'search_default_open': 1}</field>
+    </record>
+
+    <!-- Processar diverses des de la llista -->
+    <record id="action_server_process_returns" model="ir.actions.server">
+        <field name="name">Procesar devoluciones</field>
+        <field name="model_id" ref="model_shopify_return_log"/>
+        <field name="binding_model_id" ref="model_shopify_return_log"/>
+        <field name="binding_view_types">list</field>
+        <field name="state">code</field>
+        <field name="code">records.action_process()</field>
+        <field name="groups_id" eval="[(4, ref('stock.group_stock_manager'))]"/>
+    </record>
+
+    <!-- Nota d'incidència a la TT/DEV (departament de devolucions) -->
+    <record id="view_picking_form_return_incident" model="ir.ui.view">
+        <field name="name">stock.picking.form.return.incident</field>
+        <field name="model">stock.picking</field>
+        <field name="inherit_id" ref="stock.view_picking_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='origin']" position="after">
+                <field name="return_incident_note"
+                       attrs="{'invisible': [('picking_type_code', '!=', 'incoming')]}"
+                       placeholder="Artículo dañado, falta una pieza, no es lo que tocaba..."/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- ============ CONFIG ============ -->
+    <record id="view_shopify_return_config_tree" model="ir.ui.view">
+        <field name="name">shopify.return.config.tree</field>
+        <field name="model">shopify.return.config</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="name"/>
+                <field name="integration_id"/>
+                <field name="company_id"/>
+                <field name="carrier_id"/>
+                <field name="auto_process"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_shopify_return_config_form" model="ir.ui.view">
+        <field name="name">shopify.return.config.form</field>
+        <field name="model">shopify.return.config</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_fetch_returns" type="object" string="Leer devoluciones ahora"
+                            class="btn-primary" attrs="{'invisible': [('simulate_shopify', '=', True)]}"/>
+                    <button name="action_open_test_wizard" type="object" string="Crear devolución de prueba"
+                            attrs="{'invisible': [('simulate_shopify', '=', False)]}"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group string="Tienda">
+                            <field name="name"/>
+                            <field name="integration_id"/>
+                            <field name="company_id"/>
+                            <field name="active"/>
+                        </group>
+                        <group string="Nacex y almacén">
+                            <field name="carrier_id"/>
+                            <field name="nacex_return_method"/>
+                            <field name="nacex_tip_cob" attrs="{'invisible': [('nacex_return_method', '=', 'label')]}"/>
+                            <field name="nacex_shop_code" attrs="{'invisible': [('nacex_return_method', '=', 'label')]}"/>
+                            <field name="dest_partner_id"/>
+                            <field name="return_location_id"/>
+                        </group>
+                        <group string="Transportistas por país">
+                            <field name="nacex_country_ids" widget="many2many_tags"/>
+                            <field name="fedex_carrier_id"/>
+                            <field name="fedex_pickup_country_ids" widget="many2many_tags"
+                                   attrs="{'invisible': [('fedex_carrier_id', '=', False)]}"/>
+                        </group>
+                        <group string="FedEx (valores por defecto)" attrs="{'invisible': [('fedex_carrier_id', '=', False)]}">
+                            <field name="fedex_check_locations"/>
+                            <field name="fedex_location_radius" attrs="{'invisible': [('fedex_check_locations', '=', False)]}"/>
+                            <field name="fedex_pickup_from"/>
+                            <field name="fedex_pickup_to"/>
+                            <field name="fedex_weight"/>
+                            <field name="fedex_length"/>
+                            <field name="fedex_width"/>
+                            <field name="fedex_height"/>
+                            <field name="fedex_description"/>
+                            <field name="fedex_eu_no_customs"/>
+                        </group>
+                        <group string="Comportamiento">
+                            <field name="auto_process"/>
+                            <field name="return_full_order"/>
+                            <field name="max_attempts"/>
+                        </group>
+                        <group string="Shopify">
+                            <field name="shopify_notify_customer"/>
+                            <field name="shopify_add_tracking"/>
+                            <field name="shopify_upload_label"/>
+                            <field name="shopify_notify_tracking"/>
+                        </group>
+                        <group string="Recepción y reembolso">
+                            <field name="auto_accept_if_ok"/>
+                            <field name="refund_journal_id"/>
+                            <field name="auto_post_refund"/>
+                            <field name="refund_notify_customer"/>
+                        </group>
+                        <group string="Seguimiento y avisos">
+                            <field name="check_tracking"/>
+                            <field name="overdue_days"/>
+                            <field name="sync_shopify_cancel"/>
+                            <field name="summary_partner_ids" widget="many2many_tags"/>
+                        </group>
+                        <group string="Pruebas (demo)">
+                            <field name="simulate_shopify"/>
+                            <field name="simulate_nacex"/>
+                            <field name="simulate_fedex"/>
+                        </group>
+                        <group string="Emails">
+                            <field name="nacex_prealert_customer"/>
+                            <field name="send_label_email"/>
+                            <field name="mail_template_id"
+                                   attrs="{'invisible': [('send_label_email', '=', False)]}"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_shopify_return_config_search" model="ir.ui.view">
+        <field name="name">shopify.return.config.search</field>
+        <field name="model">shopify.return.config</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <filter name="inactive" string="Archivadas" domain="[('active', '=', False)]"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_shopify_return_config" model="ir.actions.act_window">
+        <field name="name">Configuración devoluciones Shopify</field>
+        <field name="res_model">shopify.return.config</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <!-- ============ WIZARD PROVA ============ -->
+    <record id="view_shopify_return_test_wizard_form" model="ir.ui.view">
+        <field name="name">shopify.return.test.wizard.form</field>
+        <field name="model">shopify.return.test.wizard</field>
+        <field name="arch" type="xml">
+            <form>
+                <group>
+                    <field name="config_id" readonly="1"/>
+                    <field name="remarks" placeholder="#347753"/>
+                    <field name="email" placeholder="tu-email@nath.es"/>
+                </group>
+                <footer>
+                    <button name="action_create" type="object" string="Crear" class="btn-primary"/>
+                    <button special="cancel" string="Cancelar"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- ============ WIZARD CIERRE SIN RECTIFICATIVA ============ -->
+    <record id="view_shopify_return_close_wizard_form" model="ir.ui.view">
+        <field name="name">shopify.return.close.wizard.form</field>
+        <field name="model">shopify.return.close.wizard</field>
+        <field name="arch" type="xml">
+            <form>
+                <field name="log_id" invisible="1"/>
+                <div class="alert alert-warning" role="alert">
+                    <field name="message" readonly="1"/>
+                </div>
+                <footer>
+                    <button name="action_force_close" type="object" string="Cerrar igualmente" class="btn-primary"/>
+                    <button special="cancel" string="Cancelar"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- ============ MENÚS ============ -->
+    <menuitem id="menu_shopify_returns_root" name="Devoluciones Shopify"
+              parent="stock.menu_stock_root" sequence="25"/>
+    <menuitem id="menu_shopify_returns_log" name="Devoluciones"
+              parent="menu_shopify_returns_root" action="action_shopify_return_log" sequence="1"/>
+    <menuitem id="menu_shopify_returns_config" name="Configuración"
+              parent="menu_shopify_returns_root" action="action_shopify_return_config" sequence="10"
+              groups="stock.group_stock_manager"/>
+
+</odoo>

@@ -1,0 +1,14 @@
+<odoo>
+    <record id="group_exchange_billing" model="res.groups">
+        <field name="name">Facturación de cambios: revisión</field>
+        <field name="implied_ids" eval="[(4, ref('account.group_account_invoice')), (4, ref('stock.group_stock_user'))]"/>
+    </record>
+    <record id="plan_company_rule" model="ir.rule">
+        <field name="name">Cambios: compañías</field><field name="model_id" ref="model_nath_exchange_plan"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="line_company_rule" model="ir.rule">
+        <field name="name">Cobertura cambios: compañías</field><field name="model_id" ref="model_nath_exchange_line"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+</odoo>

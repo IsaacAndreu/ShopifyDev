@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+	<data>
+		<record id="import_wizard_form" model="ir.ui.view">
+			<field name="name">import.operation.form</field>
+			<field name="model">import.operation.order</field>
+			<field name="type">form</field>
+			<field name="arch" type="xml">
+				<form string="Import">
+					<group col="4">
+					</group>
+					<group name="filters">
+						<group>
+							<field name="filter_by" required="True"/>
+						</group>
+						<group>
+							<field name="order_ids" attrs="{'required': [('filter_by', '=', 'order_id')],'invisible': [('filter_by','!=','order_id')]}"/>
+							<field name="order_create_date" attrs="{'required': [('filter_by', '=', 'create_date')],'invisible': [('filter_by','!=','create_date')]}"/>
+						</group>
+					</group>
+					<group>
+						<field name="filter_state" string="Filter Order Status" attrs="{'invisible': [('filter_by','=','order_id')]}"/>
+					</group>
+					<footer>
+						<button
+							string="Confirm Import"
+							type  ="object"
+							name  ="import_button"
+							class ="oe_highlight"
+						/>
+						<button string="Cancel" name="cancel" special="cancel"/>
+					</footer>
+				</form>
+			</field>
+		</record>
+
+		<record id="import_order_wizard_action" model="ir.actions.act_window">
+			<field name="name">Import Wizard</field>
+			<field name="res_model">import.operation.order</field>
+			<field name="view_mode">form</field>
+			<field name="target">new</field>
+		</record>
+	</data>
+</odoo>

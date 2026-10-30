@@ -1,0 +1,70 @@
+# nath_shopify_returns
+
+Automatitza les devolucions de la web: Shopify → TT/DEV a Odoo → Nacex (servei 44) → aprovació a Shopify.
+
+## Flux per devolució
+
+| Estat | Pas |
+|---|---|
+| Pendent | El cron llegeix de Shopify les comandes amb `return_status:return_requested` |
+| Validada | Troba la `sale.order` per `ref_remarks` i un únic OUT **Hecho**. Si la comanda té entregues parcials (un altre OUT pendent o un backorder), va a revisió manual |
+| TT/DEV creada | El mateix assistent que "Devs masivas ONLINE": per defecte, amb tota la comanda |
+| Nacex OK | `putExpedicion` servei 44. **Referència = TT/DEV**, **Observacions = TT/DEV + remarks**. El tracking de Nacex es guarda a la TT/DEV |
+| Aprovada | `returnApproveRequest` a Shopify i, a continuació, el seguiment Nacex a la devolució (`reverseDeliveryCreateWithShipping`). Així "No se requiere envío" queda lliure per als casos manuals |
+| Rebuda | El magatzem valida la TT/DEV. Es comparen les unitats esperades amb les rebudes; si hi ha diferències, queda a revisió |
+| Reemborsada | La Lorena clica **Acceptar i reemborsar**: rectificativa a Odoo (com feia `presta_auto_invoicing`, en esborrany per defecte) i reemborsament a Shopify **només de les unitats rebudes** |
+
+- **Revisió manual:** errors de negoci (no troba la comanda, SKU que no quadra, error de Nacex o de Shopify). El sistema no la torna a intentar sola: cal clicar "Reintentar".
+- **Error tècnic:** timeout, HTTP… Es reintenta sola fins a `max_attempts`.
+- Cada pas fa commit, de manera que ni la TT/DEV ni la recollida de Nacex es creen mai dues vegades.
+- Si cancel·les una devolució que ja tenia la TT/DEV creada (i encara no rebuda), també es cancel·la la TT/DEV.
+
+## Instal·lació
+
+1. Copia la carpeta a `custom_addons`, reinicia Odoo i instal·la **NATH - Devolucions Shopify automàtiques**.
+2. **Transportista:** duplica el transportista Nacex actual → *Nacex eDevoluciones TUC TUC* amb:
+   - Service Code **44**
+   - Carriage **D**
+   - Packaging **2**
+   - Agency **4307**
+   - Customer Code **60527**
+3. **Contacte d'entrega:** TUC TUC, C/Rin 6-8, 43870 Amposta, 977707005.
+4. **Configuració** (Inventari → Devolucions Shopify → Configuració), una per botiga Shopify: integració, companyia, transportista, contacte d'entrega i ubicació (`WH-OR/Stock/DEVOLUCION_ONLINE`, o la de MODAI per a la companyia 23).
+5. **Shopify:** l'app necessita els permisos `read_returns` i `write_returns`, i una versió de l'API recent (2024-01 o posterior).
+
+## Proves
+
+### A. Producció: comprovació només de lectura (sense instal·lar res)
+
+```bash
+odoo shell -c /ruta/odoo.conf -d NOM_BD --no-http < scripts/check_shopify_returns_readonly.py
+```
+
+L'script:
+
+- mostra els permisos de l'app de Shopify i les devolucions sol·licitades;
+- per cada devolució, diu què faria el mòdul (OK, revisió o ja té DEV);
+- no crida Nacex, no aprova res i acaba amb rollback.
+
+### B. Demo: simulació
+
+1. Instal·la el mòdul a la demo.
+2. A la configuració, marca **Simular Shopify** i **Simular Nacex**.
+3. Clica **Crear devolució de prova** i escriu el remarks d'una comanda amb l'OUT Hecho i el teu email.
+4. Clica **Processar**. Es crea la TT/DEV de veritat, i al xat queda la cadena exacta que s'enviaria a Nacex (referència = TT/DEV, observacions = TT/DEV + remarks).
+5. Opcional: desmarca **Simular Nacex** per fer UNA recollida real amb el teu email, i després cancel·la-la a My Nacex → Gestión. La demo té les credencials de Nacex de producció.
+
+### C. Producció: pilot
+
+
+1. Deixa **Processar automàticament** desmarcat.
+2. Clica **Llegir devolucions ara**. Es creen els registres en estat Pendent.
+3. Obre'n una i clica **Processar**.
+4. Comprova a *My Nacex → Gestión* que la recollida queda igual que una de les que es fan a mà, i mira quin email rep el client.
+5. Quan tot quadri, activa el cron *Devolucions Shopify: llegir i processar* i marca **Processar automàticament**.
+
+## Punts a validar a la primera prova
+
+- **Camps de recollida:** Nacex pot rebutjar `nom_rec`, `dir_rec`, `cp_rec`, `pob_rec`, `pais_rec` i `tel_rec`, o les longituds que hi posem. Si passa, ajusta-ho a `models/delivery_carrier.py`.
+- **Email al client:** comprova si la prealerta (`tip_pre1=E`, `pre1`=email del client) és el mateix email "eDevoluciones SHOP" que envia la web. Si no ho és, activa **Enviar etiqueta PDF des d'Odoo**.
+- **SKU:** es busca per `default_code` o `barcode` del producte.

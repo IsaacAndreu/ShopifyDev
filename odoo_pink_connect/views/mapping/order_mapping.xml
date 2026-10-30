@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<odoo>
+	<data>
+
+		<record id="pink_connect_mapping_order_tree" model="ir.ui.view">
+			<field name="name">pink.connect.order.mapping.form.tree</field>
+			<field name="model">pink.connect.order.mapping</field>
+			<field name="type">tree</field>
+			<field name="arch" type="xml">
+				<tree create = "false">
+					<field name="pink_connect_id" readonly="1"  />
+					<field name="company_id" readonly="1"  />
+
+<!--					<field name="store_customer_id" readonly="1"  />-->
+					<field name="store_order_id" readonly="1"  />
+					<field name="sale_order" readonly="1"  />
+				</tree>
+			</field>
+		</record>
+
+
+		<record id="pink_connect_mapping_order_form" model="ir.ui.view">
+			<field name="name">pink.connect.order.mapping.form</field>
+			<field name="model">pink.connect.order.mapping</field>
+			<field name="type">form</field>
+			<field name="arch" type="xml">
+				<form create = "false">
+
+<!--					<header>-->
+<!--						 <button name="create_so" string="create so" type="object" class="oe_highlight" />-->
+<!--&lt;!&ndash;						<field name="state" widget="statusbar" />&ndash;&gt;-->
+<!--					</header>-->
+
+					<sheet>
+						<group>
+							<group string='Customer Summary'>
+								<field name="partner_id" readonly="1"  />
+							</group>
+
+							<group string='Order'>
+								<field name="odoo_feed" readonly="1"  force_save="1" />
+								<field name="store_order_id" readonly="1"  />
+							</group>
+						</group>
+
+						<group >
+							<group string='Order'>
+								<field name="sale_order" readonly="1"  string='Sale Order' />
+							</group>
+							<group string='Pink Connect Configuraciones'>
+								<field name="pink_connect_id" readonly="1"  />
+								<field name="company_id" readonly="1"  />
+							</group>
+						</group>
+					</sheet>
+				</form>
+			</field>
+		</record>
+
+
+		<record id="action_pink_connect_order_mapping" model="ir.actions.act_window">
+			<field name="name">Order Mapping</field>
+			<field name="res_model">pink.connect.order.mapping</field>
+			<field name="view_mode">tree,form</field>
+		</record>
+		<!-- sub menu -->
+
+		<menuitem id="menu_id_pink_connect_order_mappings" name="Order" parent="menu_id_pink_connect_mappings" action="action_pink_connect_order_mapping" />
+	</data>
+</odoo>

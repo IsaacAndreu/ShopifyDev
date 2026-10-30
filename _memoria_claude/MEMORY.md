@@ -1,0 +1,6 @@
+- [Pendents TUCTUC](pendents-tuctuc.md) — llista de feines obertes a 26/10 (DP 1/11, auto devolucions, emails en error…)
+- [Roadmap devolucions](roadmap-devoluciones.md) — prioritats de la Lorena: VP → Mirakl (SRP, VBD, ECI últim) → reemborsaments
+- [DP Veepee automatització](dp-veepee-automatitzacio.md) — crons 450/451 (pla 1/11) + mòdul nath_vp_dropship (API Veepee, pendent demo)
+- [Estat nath_shopify_returns](nath-shopify-returns-estat.md) — 1.6.6 a producció, 1.6.7 pendent de desplegar; com es desplega; FedEx/Nacex
+- [Resum 29-30/10](resum-29-30-octubre.md) — returns 1.6.8 a prod, guard FedEx 1.1.0, pilots VP i exchange_billing, acció massiva pendent
+- [ECI Mirakl encallades](eci-mirakl-pedidos-encallats.md) — tandes sense SO, Xapusa CheckStock, cron 453 actiu en real des del 30/10
