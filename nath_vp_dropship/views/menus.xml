@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <menuitem id="menu_vp_dropship_root" name="Veepee DP" parent="sale.sale_menu_root" sequence="45"
-              groups="sales_team.group_sale_salesman"/>
+              groups="group_vp_dropship_manager"/>
     <menuitem id="menu_vp_dropship_batch" name="Batches" parent="menu_vp_dropship_root"
               action="action_vp_dropship_batch" sequence="10"/>
     <menuitem id="menu_vp_dropship_import" name="Importar Excel" parent="menu_vp_dropship_root"
