@@ -1,3 +1,5 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 config_manager,VP config manager,model_vp_return_config,nath_vp_returns.group_vp_manager,1,1,1,0
 request_manager,VP request manager,model_vp_return_request,nath_vp_returns.group_vp_manager,1,1,1,0
+request_stock_user,VP request stock user,model_vp_return_request,stock.group_stock_user,1,1,1,0
+config_stock_user,VP config stock user (lectura),model_vp_return_config,stock.group_stock_user,1,0,0,0

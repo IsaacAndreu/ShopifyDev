@@ -37,7 +37,7 @@
          reubica aquí i aquest pilot hi afegeix la branca VP. -->
     <menuitem id="menu_returns_root" name="Devoluciones Online" parent="stock.menu_stock_root" sequence="25"/>
     <record id="nath_shopify_returns.menu_shopify_returns_root" model="ir.ui.menu"><field name="name">Shopify</field><field name="parent_id" ref="menu_returns_root"/></record>
-    <menuitem id="menu_vp" name="VP / PinkConnect" parent="menu_returns_root" sequence="20" groups="group_vp_manager"/>
+    <menuitem id="menu_vp" name="VP / PinkConnect" parent="menu_returns_root" sequence="20"/>
     <menuitem id="menu_requests" name="Solicitudes" parent="menu_vp" action="request_action"/>
-    <menuitem id="menu_config" name="Configuración" parent="menu_vp" action="config_action" sequence="20"/>
+    <menuitem id="menu_config" name="Configuración" parent="menu_vp" action="config_action" sequence="20" groups="group_vp_manager"/>
 </odoo>
