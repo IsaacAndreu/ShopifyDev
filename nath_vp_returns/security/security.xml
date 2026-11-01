@@ -13,4 +13,9 @@
         <field name="model_id" ref="model_vp_return_request"/>
         <field name="domain_force">[('company_id', 'in', company_ids)]</field>
     </record>
+    <record id="return_company_rule" model="ir.rule">
+        <field name="name">VP devoluciones: compañías</field>
+        <field name="model_id" ref="model_vp_return"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
 </odoo>

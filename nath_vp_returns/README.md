@@ -76,3 +76,11 @@ cobreixen sintaxi Python/XML i les proteccions de lectura/importació.
 - Cada sol·licitud es diu «comanda · clienta» (com a Shopify) en lloc de l'ID tècnic. La llista mostra Fecha, Pedido, Cliente, País, Producto, Motivo i Estado VP; l'ID de la sol·licitud queda al formulari i com a columna opcional.
 - Producte: es busca pel GTIN (sempre és l'EAN) i, si no, pel SKU (EAN o referència).
 - Fecha: la `requestDate` de PinkConnect («29/10/2026 10:35:06», hora de Madrid).
+
+## Canvis 13.0.0.2.0 — circuit fase 1 (llegir i crear la TT/DEV)
+
+- Nou model **Devolución VP** (`vp.return`): una per comanda de PinkConnect, amb les sol·licituds (una per peça) a dins. Menú *VP / PinkConnect → Devoluciones* (la llista d'abans queda com a *Artículos*).
+- **«Leer pendientes ahora»** (Configuración) i cron *Devoluciones VP: leer pendientes de PinkConnect* (cada hora, **desactivat**): `GET /return-requests?status=PENDING` per pàgines de 50 (`offset`). Si l'API torna la mateixa pàgina, s'atura i ho diu al resultat. Després rellegeix per `orderId` (màx. 20) les comandes que tenim en PENDING i ja no hi surten, per tenir l'estat bo (p. ex. acceptades a mà a VP).
+- **Validació** (no crea res): comanda d'Odoo inequívoca i de la companyia, OUT validats i sense entregues pendents, cada peça a l'OUT amb prou unitats. Si ja hi ha una TT/DEV d'aquests OUT (feta a mà), s'aprofita. Si alguna cosa no quadra: estat *Revisar* amb el motiu.
+- **Crear TT/DEV**: com «Devs masivas ONLINE» i el mòdul Shopify (retorn de l'OUT, `to_refund`), per defecte **amb tota la comanda** (és el que fa la Lorena), a la ubicació configurada. Amb **«Simular TT/DEV»** (per defecte) només escriu al xat el que crearia. Automàtic només si «Crear TT/DEV automáticamente» i sense simular.
+- Encara **no**: transport (Nacex/FedEx), missatge a la clienta, acceptar a VP (`PUT …/PROCESSING`), recepció ni reemborsament.
