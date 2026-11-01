@@ -69,3 +69,10 @@ en aquesta versió; comandes amb 50 resultats poden tenir més dades.
 No és encara una versió del circuit complet. La instal·lació i execució
 dins Odoo 13 s'han de verificar a la demo; les comprovacions locals només
 cobreixen sintaxi Python/XML i les proteccions de lectura/importació.
+
+## Canvis 13.0.0.1.4
+
+- Solicitudes VP: la veuen tots els usuaris d'Inventari; la Configuración (API) només el grup «Devoluciones VP: configuración».
+- Cada sol·licitud es diu «comanda · clienta» (com a Shopify) en lloc de l'ID tècnic. La llista mostra Fecha, Pedido, Cliente, País, Producto, Motivo i Estado VP; l'ID de la sol·licitud queda al formulari i com a columna opcional.
+- Producte: es busca pel GTIN (sempre és l'EAN) i, si no, pel SKU (EAN o referència).
+- Fecha: la `requestDate` de PinkConnect («29/10/2026 10:35:06», hora de Madrid).

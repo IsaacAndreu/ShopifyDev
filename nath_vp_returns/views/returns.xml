@@ -21,12 +21,14 @@
     </record>
     <record id="request_tree" model="ir.ui.view">
         <field name="name">vp.return.request.tree</field><field name="model">vp.return.request</field>
-        <field name="arch" type="xml"><tree create="false" delete="false"><field name="remote_id"/><field name="order_id"/><field name="remote_status"/><field name="sale_id"/><field name="simulated"/><field name="company_id"/></tree></field>
+        <field name="arch" type="xml"><tree create="false" delete="false"><field name="request_date"/><field name="sale_id"/><field name="partner_id"/><field name="country_id"/><field name="product_id"/><field name="reason"/><field name="remote_status"/><field name="return_type" optional="hide"/><field name="remote_id" optional="hide"/><field name="simulated" optional="hide"/><field name="company_id" optional="hide"/></tree></field>
     </record>
     <record id="request_form" model="ir.ui.view">
         <field name="name">vp.return.request.form</field><field name="model">vp.return.request</field>
         <field name="arch" type="xml"><form create="false" delete="false"><header><button name="action_preview" type="object" string="Simular / previsualizar" class="oe_highlight"/></header><sheet>
-            <group><field name="config_id" readonly="1"/><field name="company_id"/><field name="remote_id"/><field name="order_id"/><field name="remote_status"/><field name="simulated"/><field name="sale_id"/></group>
+            <div class="oe_title"><h1><field name="name"/></h1></div>
+            <group><group><field name="sale_id"/><field name="partner_id"/><field name="country_id"/><field name="product_id"/><field name="request_date"/></group>
+                <group><field name="remote_status"/><field name="config_id" readonly="1"/><field name="company_id"/><field name="remote_id"/><field name="order_id"/><field name="simulated"/></group></group>
             <group string="Datos de la solicitud"><field name="order_line_id"/><field name="marketplace_return_id"/><field name="marketplace_order_number"/><field name="sku"/><field name="gtin"/><field name="return_type"/><field name="reason"/></group>
             <notebook><page string="Previsualización"><field name="preview"/></page><page string="Datos originales"><field name="payload"/></page></notebook>
         </sheet><div class="oe_chatter"><field name="message_follower_ids"/><field name="message_ids"/></div></form></field>

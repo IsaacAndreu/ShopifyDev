@@ -1,10 +1,14 @@
 import json
+from datetime import datetime
 from urllib.parse import urlsplit
 
+import pytz
 import requests
 
-from odoo import fields, models, _
+from odoo import api, fields, models, _
 from odoo.exceptions import UserError
+
+MADRID = pytz.timezone('Europe/Madrid')
 
 
 class VPReturnConfig(models.Model):
@@ -123,9 +127,14 @@ class VPReturnRequest(models.Model):
     _name = 'vp.return.request'
     _description = 'Solicitud de devolución VP'
     _inherit = ['mail.thread']
-    _rec_name = 'remote_id'
+    _rec_name = 'name'
     _order = 'id desc'
 
+    name = fields.Char('Solicitud', compute='_compute_name', store=True)
+    product_id = fields.Many2one('product.product', 'Producto', compute='_compute_product', store=True)
+    partner_id = fields.Many2one(related='sale_id.partner_id', string='Cliente', store=True)
+    country_id = fields.Many2one(related='sale_id.partner_shipping_id.country_id', string='País', store=True)
+    request_date = fields.Datetime('Fecha', compute='_compute_request_date', store=True)
     config_id = fields.Many2one('vp.return.config', required=True, ondelete='restrict')
     company_id = fields.Many2one(related='config_id.company_id', store=True)
     remote_id = fields.Char('ID solicitud', required=True, readonly=True)
@@ -145,6 +154,43 @@ class VPReturnRequest(models.Model):
 
     _sql_constraints = [('request_unique', 'unique(config_id, remote_id, simulated)',
                          'Esta solicitud ya está importada en esta configuración.')]
+
+    @api.depends('gtin', 'sku')
+    def _compute_product(self):
+        # El GTIN sempre porta l'EAN; el SKU de vegades és l'EAN i de vegades la referència.
+        Product = self.env['product.product'].with_context(active_test=False)
+        for rec in self:
+            product = Product
+            for code in filter(None, (rec.gtin, rec.sku)):
+                product = Product.search([('barcode', '=', code)], limit=1) or \
+                    Product.search([('default_code', '=', code)], limit=1)
+                if product:
+                    break
+            rec.product_id = product
+
+    @api.depends('payload')
+    def _compute_request_date(self):
+        # PinkConnect envia «29/10/2026 10:35:06» en hora local; Odoo la guarda en UTC.
+        for rec in self:
+            rec.request_date = False
+            try:
+                raw = (json.loads(rec.payload or '{}').get('requestDate') or '').strip()
+            except ValueError:
+                continue
+            for fmt in ('%d/%m/%Y %H:%M:%S', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%d %H:%M:%S'):
+                try:
+                    local = MADRID.localize(datetime.strptime(raw[:19], fmt))
+                except ValueError:
+                    continue
+                rec.request_date = local.astimezone(pytz.utc).replace(tzinfo=None)
+                break
+
+    @api.depends('sale_id', 'order_id', 'partner_id')
+    def _compute_name(self):
+        # Com a Shopify: comanda i clienta, sense l'ID tècnic de la sol·licitud.
+        for rec in self:
+            order = rec.sale_id.name or rec.order_id
+            rec.name = ' · '.join(filter(None, (order, rec.partner_id.name))) or rec.remote_id
 
     def action_preview(self):
         self.check_access_rights('write')
