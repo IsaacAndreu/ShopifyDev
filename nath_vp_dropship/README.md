@@ -27,6 +27,10 @@ La confirmació, les agrupacions i les oleades les continuen fent els crons 450 
    El botó «Crear pedidos» (1.2) ho fa tot en segon pla: un `queue.job` crea 50 comandes i n'encua
    un altre fins que no en queden. Si un restart deixa el job en `started`, al cap de 20 min es pot
    tornar a prémer el botó. Les comandes es creen en esborrany (no es confirma res).
+   Quan totes estan creades, el botó «Confirmar pedidos» (1.2) les confirma en segon pla, també en lots
+   de 50 (commit per comanda). Si una falla, es deixa en esborrany amb el motiu al chatter i les altres
+   continuen; al final, el batch diu quantes n'han quedat sense confirmar. Abans de confirmar, posa el
+   «Modo de pago» de la configuració si la comanda no en té.
    - primer, el *Dropshipping Veepee Product ID* de cada variant (la part del `Product_Code` abans de `_`);
    - després, una comanda `DP-<orderId>` per cada comanda de Veepee, amb aquestes dades:
      - client, tarifa (ES / FR-BENELUX / IT), preu del fitxer, IVA;

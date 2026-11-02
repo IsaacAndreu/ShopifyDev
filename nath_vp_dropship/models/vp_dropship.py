@@ -296,6 +296,8 @@ class VpDropshipBatch(models.Model):
     n_error = fields.Integer('Con errores', compute='_compute_counts')
     n_pending = fields.Integer('Pendientes', compute='_compute_counts')
     create_job_uuid = fields.Char('Job de creación', readonly=True, copy=False)
+    confirm_job_uuid = fields.Char('Job de confirmación', readonly=True, copy=False)
+    n_to_confirm = fields.Integer('Por confirmar', compute='_compute_n_to_confirm')
 
     _sql_constraints = [('batch_uniq', 'unique(config_id, operation_ref, batch_ref)', 'Batch ya descargado.')]
 
@@ -313,6 +315,11 @@ class VpDropshipBatch(models.Model):
             b.n_created = len(lines.filtered(lambda l: l.state in ('created', 'exists')))
             b.n_error = len(lines.filtered(lambda l: l.state == 'error'))
             b.n_pending = len(lines.filtered(lambda l: l.state == 'pending'))
+
+    def _compute_n_to_confirm(self):
+        for b in self:
+            b.n_to_confirm = self.env['sale.order'].search_count(
+                [('dp_batch_id', '=', b.id), ('state', 'in', ('draft', 'sent'))]) if b.id else 0
 
     # ------------------------------------------------------------------
     def _rows(self, api=None):
@@ -455,11 +462,11 @@ class VpDropshipBatch(models.Model):
             self.state = 'downloaded'
 
     # ------------------------------------------------------------------
-    def _create_job_running(self):
-        """El job de creació encara és viu (pendent, a la cua o en marxa des de fa poc)."""
-        if not self.create_job_uuid:
+    def _job_running(self, uuid):
+        """El job encara és viu (pendent, a la cua o en marxa des de fa poc)."""
+        if not uuid:
             return False
-        qjob = self.env['queue.job'].sudo().search([('uuid', '=', self.create_job_uuid)], limit=1)
+        qjob = self.env['queue.job'].sudo().search([('uuid', '=', uuid)], limit=1)
         if qjob.state in ('pending', 'enqueued'):
             return True
         return (qjob.state == 'started' and qjob.date_started
@@ -472,7 +479,7 @@ class VpDropshipBatch(models.Model):
     def action_create_orders(self):
         """Crea totes les comandes pendents en segon pla, en lots encadenats de JOB_ORDERS."""
         self.ensure_one()
-        if self._create_job_running():
+        if self._job_running(self.create_job_uuid):
             raise UserError(_('Los pedidos de este batch ya se están creando en segundo plano.'))
         self._enqueue_create_orders()
         self.message_post(body=_('Creando %s pedidos en segundo plano (lotes de %s). '
@@ -490,6 +497,56 @@ class VpDropshipBatch(models.Model):
         if pending:
             self._enqueue_create_orders()
         return _('Creados: %s · pendientes: %s') % (done, pending)
+
+    def _enqueue_confirm_orders(self, skip_ids=None):
+        qjob = self.with_delay(description=_('Veepee DP: confirmar pedidos %s') % self.name
+                               )._job_confirm_orders(skip_ids or [])
+        self.confirm_job_uuid = qjob.uuid
+
+    def action_confirm_orders(self):
+        """Confirma en segon pla els pedidos en esborrany del batch, en lots de JOB_ORDERS."""
+        self.ensure_one()
+        if self._job_running(self.create_job_uuid) or self.n_pending:
+            raise UserError(_('Primero tienen que estar creados todos los pedidos del batch.'))
+        if self._job_running(self.confirm_job_uuid):
+            raise UserError(_('Los pedidos de este batch ya se están confirmando en segundo plano.'))
+        if not self.n_to_confirm:
+            raise UserError(_('No hay pedidos por confirmar en este batch.'))
+        self._enqueue_confirm_orders()
+        self.message_post(body=_('Confirmando %s pedidos en segundo plano (lotes de %s). '
+                                 'Recarga la página para ver el avance.') % (self.n_to_confirm, JOB_ORDERS))
+        return True
+
+    @_as_job
+    def _job_confirm_orders(self, skip_ids):
+        """Un lot: confirma JOB_ORDERS pedidos (commit per pedido) i encua el següent.
+        skip_ids: els que ja han fallat en lots anteriors (no es tornen a provar)."""
+        self.ensure_one()
+        config = self.config_id
+        skip_ids = list(skip_ids or [])
+        SaleOrder = self.env['sale.order']
+        domain = [('dp_batch_id', '=', self.id), ('state', 'in', ('draft', 'sent')), ('id', 'not in', skip_ids)]
+        done = 0
+        for sale in SaleOrder.search(domain, order='id', limit=JOB_ORDERS):
+            try:
+                if config.payment_mode_id and not sale.payment_mode_id:
+                    sale.payment_mode_id = config.payment_mode_id
+                sale.action_confirm()
+                self.env.cr.commit()
+                done += 1
+            except Exception as e:
+                self.env.cr.rollback()
+                self.env.clear()   # que no es reescrigui res del pedido fallit
+                skip_ids.append(sale.id)
+                sale.message_post(body=_('Veepee DP: no se ha podido confirmar: %s') % str(e)[:500])
+                self.env.cr.commit()
+        if SaleOrder.search_count(domain[:2] + [('id', 'not in', skip_ids)]):
+            self._enqueue_confirm_orders(skip_ids)
+        else:
+            failed = SaleOrder.browse(skip_ids).exists().filtered(lambda s: s.state in ('draft', 'sent'))
+            self.message_post(body=_('Confirmación terminada. Sin confirmar por error: %s%s') % (
+                len(failed), (': ' + ', '.join(failed.mapped('name')[:100])) if failed else ''))
+        return _('Confirmados: %s · con error en total: %s') % (done, len(skip_ids))
 
     def _update_veepee_ids(self, orders):
         """Pas 'Actualització Dropshipping Veepee Product ID': cada variant amb el seu id de Veepee."""

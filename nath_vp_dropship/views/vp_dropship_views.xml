@@ -147,6 +147,11 @@
                             confirm="Se crearán todos los pedidos pendientes en segundo plano, por lotes. ¿Continuar?"
                             attrs="{'invisible': ['|', ('state', 'not in', ('downloaded', 'creating', 'review')),
                                                   ('n_pending', '=', 0)]}"/>
+                    <!-- Confirma en segon pla (queue.job, lots de 50) quan ja estan totes creades -->
+                    <button name="action_confirm_orders" type="object" string="Confirmar pedidos" class="btn-primary"
+                            confirm="Se confirmarán en segundo plano, por lotes, todos los pedidos en borrador de este batch. ¿Continuar?"
+                            attrs="{'invisible': ['|', '|', ('state', 'not in', ('done', 'review')),
+                                                  ('n_pending', '!=', 0), ('n_to_confirm', '=', 0)]}"/>
                     <!-- Sense botó "Cerrar batch en Veepee": a TUCTUC no es tanquen mai els batches -->
                     <field name="state" widget="statusbar" statusbar_visible="downloaded,creating,done"/>
                 </header>
@@ -171,6 +176,7 @@
                             <field name="n_units"/>
                             <field name="n_pending"/>
                             <field name="n_error"/>
+                            <field name="n_to_confirm"/>
                             <field name="source_file" filename="source_filename"
                                    attrs="{'invisible': [('source_file', '=', False)]}"/>
                             <field name="source_filename" invisible="1"/>
