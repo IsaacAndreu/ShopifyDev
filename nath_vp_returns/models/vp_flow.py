@@ -2,7 +2,8 @@
 acceptació a VP i recepció.
 
 Ordre (cada pas queda desat abans del següent; en reintentar es continua pel que falta):
-1. TT/DEV (vp_returns.py), només amb els articles que demana VP.
+1. TT/DEV (vp_returns.py), amb tota la comanda com es fa a mà: el magatzem valida només el que
+   arriba i anul·la la resta (02/11: 62 de 120 DEV VP validades així, rectificatives bé).
 2. Etiqueta: ES = Nacex 44 eDevolución oberta (com Shopify); FR = FedEx amb recollida a domicili
    l'endemà feiner i «PREVENIR A L'AVANCE». Si FedEx no accepta la recollida, s'atura (sense
    passar a entrega a punt com fa Shopify).

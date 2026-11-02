@@ -41,9 +41,10 @@ class VPReturnConfig(models.Model):
         'Simular (no crea nada)', default=True,
         help='No crea TT/DEV, transporte ni mensaje, ni acepta en VP: escribe en el chat lo que haría.')
     return_full_order = fields.Boolean(
-        'TT/DEV con todo el pedido', default=False,
-        help='Desmarcado: solo los artículos que pide VP. '
-             'Marcado: todas las líneas del OUT (la rectificativa de PinkConnect saldría de todas).')
+        'TT/DEV con todo el pedido', default=True,
+        help='Marcado: como se hace ahora a mano (todas las líneas del OUT); el almacén valida solo lo '
+             'que llega y anula el resto, y la rectificativa de PinkConnect sale solo de lo validado. '
+             'Desmarcado: solo los artículos que pide VP.')
     return_location_id = fields.Many2one(
         'stock.location', 'Ubicación de devolución',
         help='p. ej. WH-OR/Stock/DEVOLUCION_ONLINE')

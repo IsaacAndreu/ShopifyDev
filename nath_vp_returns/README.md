@@ -89,7 +89,7 @@ cobreixen sintaxi Python/XML i les proteccions de lectura/importació.
 
 Botó **«Procesar»** a la devolució: fa tots els passos seguits. Cada pas queda desat abans del següent; si un falla, la devolució queda a *Revisar* i **«Reintentar»** continua pel pas que faltava, sense repetir res.
 
-1. **TT/DEV** només amb els articles que demana VP («TT/DEV con todo el pedido» desmarcat per defecte). Abans de crear res, totes les peces han d'estar PENDING a VP.
+1. **TT/DEV amb tota la comanda**, com es fa a mà («TT/DEV con todo el pedido», per defecte). El magatzem valida **només el que arriba** i les altres línies queden anul·lades, sense backorder: la rectificativa de PinkConnect surt només del que s'ha validat (comprovat el 02/11 amb 120 TT/DEV VP). Abans de crear res, totes les peces demanades han d'estar PENDING a VP. A VP només s'accepten les línies que demana.
 2. **Etiqueta**, sempre amb els transportistes de la configuració, **mai el de l'OUT** (els OUT de VP de França porten el «Fedex» antic, arxivat):
    - ES: **eDevoluciones 44 Nacex** (350), eDevolución oberta (`genEtiquetaDevolucion`), com Shopify.
    - FR: **Fedex Rest** (346), enviament d'importació i **recollida a domicili** l'endemà feiner (horari de «Parámetros de transporte»), amb la instrucció «PREVENIR A L'AVANCE». Si FedEx no accepta la recollida, s'atura (no passa a entrega a punt).
