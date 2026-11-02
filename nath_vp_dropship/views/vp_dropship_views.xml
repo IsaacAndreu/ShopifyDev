@@ -59,9 +59,10 @@
                                     <field name="payment_term_id"/>
                                     <field name="delivery_days"/>
                                     <field name="use_price_file"/>
-                                    <field name="pricelist_es_id"/>
-                                    <field name="pricelist_fr_benelux_id"/>
-                                    <field name="pricelist_it_id"/>
+                                    <!-- Es fa servir la tarifa del client; només per a casos especials -->
+                                    <field name="pricelist_es_id" invisible="1"/>
+                                    <field name="pricelist_fr_benelux_id" invisible="1"/>
+                                    <field name="pricelist_it_id" invisible="1"/>
                                 </group>
                             </group>
                         </page>
@@ -70,7 +71,7 @@
                                 <tree editable="bottom">
                                     <field name="key"/>
                                     <field name="carrier_id"/>
-                                    <field name="tarifa"/>
+                                    <field name="tarifa" optional="hide"/>
                                 </tree>
                             </field>
                         </page>

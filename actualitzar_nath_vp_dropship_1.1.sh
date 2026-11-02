@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Actualitza nath_vp_dropship 13.0.0.1.0 -> 13.0.0.1.1 (fix descàrrega API: ir.attachment sense camp raw).
+# Actualitza nath_vp_dropship 13.0.0.1.0 -> 13.0.0.1.1 (fix descàrrega API: ir.attachment sense camp raw; tarifes amagades, la del client per defecte).
 # 1) Comprova el paquet (Python, XML, versió).
 # 2) Fa còpia de la versió instal·lada i la substitueix.
 # 3) Si ho confirmes: odoo-bin -u amb el servei en marxa (--no-http, sense crons).

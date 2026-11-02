@@ -91,8 +91,10 @@ class VpDropshipConfig(models.Model):
         return VeepeeApi(cfg.base_url, cfg.api_version, cfg.api_user, cfg.api_password)
 
     def _pricelist(self, tarifa):
-        return {'es': self.pricelist_es_id, 'fr_benelux': self.pricelist_fr_benelux_id,
-                'it': self.pricelist_it_id}.get(tarifa)
+        # sense tarifa específica: la del client (WholeSale ES-PT)
+        return ({'es': self.pricelist_es_id, 'fr_benelux': self.pricelist_fr_benelux_id,
+                 'it': self.pricelist_it_id}.get(tarifa)
+                or self.partner_id.property_product_pricelist)
 
     def _in_window(self):
         now = datetime.now(TZ)
@@ -222,9 +224,16 @@ class VpDropshipCarrier(models.Model):
     config_id = fields.Many2one('vp.dropship.config', required=True, ondelete='cascade')
     key = fields.Char('País#Transportista Veepee', required=True, help='Columna LI_Pays: ES#ASM')
     carrier_id = fields.Many2one('delivery.carrier', 'Transportista Odoo', required=True)
-    tarifa = fields.Selection(TARIFA_SELECTION, 'Tarifa', required=True)
+    tarifa = fields.Selection(TARIFA_SELECTION, 'Tarifa',
+                              help='Solo para el fichero de precios. Si se deja vacía, la del país (ES#...).')
 
     _sql_constraints = [('key_uniq', 'unique(config_id, key)', 'Esta clave ya está mapeada.')]
+
+    @api.model
+    def create(self, vals):
+        if not vals.get('tarifa') and vals.get('key'):
+            vals['tarifa'] = TARIFA_BY_COUNTRY.get(vals['key'].split('#')[0].strip().upper())
+        return super().create(vals)
 
 
 class VpDropshipPrice(models.Model):
