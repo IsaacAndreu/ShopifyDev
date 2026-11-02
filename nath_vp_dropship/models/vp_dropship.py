@@ -305,11 +305,15 @@ class VpDropshipBatch(models.Model):
             api = config._api()
             api.login()
         data = api.batch(self.operation_ref, self.batch_ref)
+        import base64
+        # Odoo 13: ir.attachment no té 'raw' (és de la 14), cal 'datas' en base64
         self.env['ir.attachment'].create({
             'name': 'veepee_%s_%s.json' % (self.operation_code, self.batch_ref),
             'res_model': self._name, 'res_id': self.id, 'mimetype': 'application/json',
-            'raw': json.dumps(data, ensure_ascii=False, indent=1).encode('utf-8'),
+            'datas': base64.b64encode(json.dumps(data, ensure_ascii=False, indent=1).encode('utf-8')),
         })
+        # que la resposta de Veepee es quedi guardada encara que després falli la lectura
+        self.env.cr.commit()
         return vp_parse.rows_from_api(data, self.operation_code, self.batch_ref)
 
     def action_download(self):

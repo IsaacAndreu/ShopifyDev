@@ -3,7 +3,7 @@
     'name': 'NATH - Dropshipping Veepee (batches automáticos)',
     'summary': 'Descarga los batches de dropshipment.veepee.com y crea los pedidos DP- '
                'con precio, transportista y fecha de entrega',
-    'version': '13.0.0.1.0',
+    'version': '13.0.0.1.1',
     'category': 'Sales',
     'author': 'NATH',
     'license': 'LGPL-3',
