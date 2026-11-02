@@ -12,6 +12,10 @@
                     <button name="action_fetch_now" type="object" string="Buscar batches ahora" class="btn-primary"
                             attrs="{'invisible': [('simulate_api', '=', True)]}"/>
                     <button name="action_fill_carriers" type="object" string="Añadir transportistas 'Veepee - …'"/>
+                    <button name="action_simulate_confirm_group" type="object"
+                            string="Simular confirmación y agrupaciones"/>
+                    <button name="action_confirm_group_now" type="object" string="Confirmar y agrupar ahora"
+                            confirm="Se confirman pedidos DP- (o se crea una tanda de agrupaciones y oleadas) ahora mismo, sin mirar el horario. ¿Continuar?"/>
                 </header>
                 <sheet>
                     <div class="oe_title"><h1><field name="name"/></h1></div>
@@ -35,10 +39,25 @@
                             </div>
                             <field name="start_date"/>
                             <field name="auto_create"/>
-                            <field name="group_after_confirm"/>
                             <field name="max_seconds"/>
                             <field name="last_fetch"/>
                             <field name="last_error" attrs="{'invisible': [('last_error', '=', False)]}"/>
+                        </group>
+                    </group>
+                    <!-- Abans crons 450 i 451: confirmar DP- i després agrupacions + oleades -->
+                    <group string="Confirmación, agrupaciones y oleadas">
+                        <group>
+                            <field name="auto_confirm"/>
+                            <label for="confirm_from" string="Horario (entre semana)"/>
+                            <div>
+                                <field name="confirm_from" widget="float_time" class="oe_inline"/> -
+                                <field name="confirm_to" widget="float_time" class="oe_inline"/>
+                                (día siguiente; sábado y domingo, todo el día)
+                            </div>
+                        </group>
+                        <group>
+                            <field name="confirm_seconds"/>
+                            <field name="group_size"/>
                         </group>
                     </group>
                     <notebook>
@@ -148,15 +167,6 @@
                             confirm="Se crearán todos los pedidos pendientes en segundo plano, por lotes. ¿Continuar?"
                             attrs="{'invisible': ['|', ('state', 'not in', ('downloaded', 'creating', 'review')),
                                                   ('n_pending', '=', 0)]}"/>
-                    <!-- Confirma en segon pla (queue.job, lots de 50) quan ja estan totes creades -->
-                    <button name="action_confirm_orders" type="object" string="Confirmar pedidos" class="btn-primary"
-                            confirm="Se confirmarán en segundo plano, por lotes, todos los pedidos en borrador de este batch y, al terminar, las agrupaciones (si está marcado en la configuración). ¿Continuar?"
-                            attrs="{'invisible': ['|', '|', ('state', 'not in', ('done', 'review')),
-                                                  ('n_pending', '!=', 0), ('n_to_confirm', '=', 0)]}"/>
-                    <!-- Agrupacions (Batch Transfer) per país + transportista, una a una en segon pla -->
-                    <button name="action_create_groups" type="object" string="Crear agrupaciones"
-                            confirm="Se crearán en segundo plano las agrupaciones (máx. 150 albaranes) de los pedidos confirmados de este batch. ¿Continuar?"
-                            attrs="{'invisible': ['|', ('state', 'not in', ('done', 'review')), ('n_pending', '!=', 0)]}"/>
                     <!-- Sense botó "Cerrar batch en Veepee": a TUCTUC no es tanquen mai els batches -->
                     <field name="state" widget="statusbar" statusbar_visible="downloaded,creating,done"/>
                 </header>
@@ -181,7 +191,6 @@
                             <field name="n_units"/>
                             <field name="n_pending"/>
                             <field name="n_error"/>
-                            <field name="n_to_confirm"/>
                             <field name="source_file" filename="source_filename"
                                    attrs="{'invisible': [('source_file', '=', False)]}"/>
                             <field name="source_filename" invisible="1"/>

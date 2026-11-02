@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Actualitza nath_vp_dropship 13.0.0.1.1 -> 13.0.0.1.2 («Crear pedidos» en segon pla amb queue.job, lots de 50; botons «Confirmar pedidos» i «Crear agrupaciones» (encadenat després de confirmar); modo de pago de la configuració; depèn de queue_job).
+# Actualitza nath_vp_dropship 13.0.0.1.1 -> 13.0.0.1.2 («Crear pedidos» en segon pla amb queue.job; cron del mòdul per confirmar DP- i crear agrupacions + oleades, inactiu; modo de pago de la configuració; depèn de queue_job).
 # 1) Comprova el paquet (Python, XML, versió).
 # 2) Fa còpia de la versió instal·lada i la substitueix.
 # 3) Si ho confirmes: odoo-bin -u amb el servei en marxa (--no-http, sense crons).

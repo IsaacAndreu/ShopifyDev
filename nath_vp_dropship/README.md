@@ -27,15 +27,20 @@ La confirmació, les agrupacions i les oleades les continuen fent els crons 450 
    El botó «Crear pedidos» (1.2) ho fa tot en segon pla: un `queue.job` crea 50 comandes i n'encua
    un altre fins que no en queden. Si un restart deixa el job en `started`, al cap de 20 min es pot
    tornar a prémer el botó. Les comandes es creen en esborrany (no es confirma res).
-   Quan totes estan creades, el botó «Confirmar pedidos» (1.2) les confirma en segon pla, també en lots
-   de 50 (commit per comanda). Si una falla, es deixa en esborrany amb el motiu al chatter i les altres
-   continuen; al final, el batch diu quantes n'han quedat sense confirmar. Abans de confirmar, posa el
-   «Modo de pago» de la configuració si la comanda no en té.
-   Després, «Crear agrupaciones» (1.2) fa els Batch Transfer dels albarans de les comandes confirmades
-   del batch: un per país + transportista (`B-DP_ES_ASM_<ddmmaa del batch>`), màxim 150 albarans
-   (si n'hi ha més: `_1`, `_2`…). Una agrupació cada vegada, amb commit, per no bloquejar els crons.
-   Amb «Agrupar al terminar de confirmar» (per defecte marcat), les agrupacions es fan soles quan acaba
-   «Confirmar pedidos»: un sol clic i ja es pot marxar.
+   **Confirmació, agrupacions i oleades (1.2, abans crons 450 i 451):** amb «Confirmar y agrupar
+   automáticamente», el cron «Veepee DP: confirmar pedidos y crear agrupaciones y oleadas» (cada 2 min)
+   fa, entre setmana de 17:00 a 07:00 i el cap de setmana tot el dia:
+   - confirma els pedidos `DP-` en esborrany un a un (`confirm='yes'`, commit per pedido) durant
+     90 s per execució; només els que tenen transportista, data, modo i plazo de pago (si un pedido
+     del mòdul no té modo de pago, posa el de la configuració); els que fallen no es tornen a provar
+     fins al cap de 24 h;
+   - quan no en queda cap per confirmar: agrupacions dels OUT reservats (sense res preparat, no al
+     SORTER) per transportista + data prevista, `B-DP_<transportista>_<ddmmaa del batch>`, màxim 150
+     repartits per igual (`_1`, `_2`…), i «Crear transfer para oleada» de cada una; una cada vegada,
+     amb commit, per no bloquejar els altres crons.
+   Tot queda a *Ajustes → Técnico → Registros* amb els mateixos noms que els crons 450 i 451.
+   Botons a la configuració: «Simular confirmación y agrupaciones» (no canvia res) i «Confirmar y
+   agrupar ahora» (una execució sense mirar l'horari). **Quan s'activi, desactivar els crons 450 i 451.**
    - primer, el *Dropshipping Veepee Product ID* de cada variant (la part del `Product_Code` abans de `_`);
    - després, una comanda `DP-<orderId>` per cada comanda de Veepee, amb aquestes dades:
      - client, tarifa (ES / FR-BENELUX / IT), preu del fitxer, IVA;

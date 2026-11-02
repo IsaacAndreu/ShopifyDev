@@ -22,10 +22,18 @@ def _as_job(func):
     return _job(func) if _job else func
 
 
+def _hhmm(value):
+    """17.25 -> '17:15'"""
+    minutes = int(round((value or 0.0) * 60))
+    return '%02d:%02d' % (minutes // 60, minutes % 60)
+
+
 _logger = logging.getLogger(__name__)
 TZ = pytz.timezone('Europe/Madrid')
 JOB_ORDERS = 50          # comandes per lot en segon pla (~2 min, per sota del límit del worker)
-GROUP_SIZE = 150         # albarans per agrupació (Batch Transfer)
+# Mateixos noms que els crons 450 i 451 (Registros): l'historial i el «ja ha fallat en 24 h» continuen
+LOG_CONFIRM = 'DP: confirmar pedidos automaticamente'
+LOG_GROUP = 'DP: crear agrupaciones y oleadas'
 JOB_STALE_MINUTES = 20   # un job 'started' més vell que això és d'abans d'un restart: es pot rellançar
 TARIFA_SELECTION = [('es', 'ES'), ('fr_benelux', 'FR / BENELUX'), ('it', 'IT')]
 # Tarifa per país quan el transportista no és a la taula de mapeig
@@ -54,9 +62,15 @@ class VpDropshipConfig(models.Model):
     auto_fetch = fields.Boolean('Descargar batches automáticamente')
     auto_create = fields.Boolean('Crear pedidos automáticamente',
                                  help='Si no, los pedidos se crean con el botón del batch.')
-    group_after_confirm = fields.Boolean(
-        'Agrupar al terminar de confirmar', default=True,
-        help='Al acabar "Confirmar pedidos" se crean solas las agrupaciones del batch.')
+    # Confirmació i agrupacions (abans crons 450 i 451)
+    auto_confirm = fields.Boolean(
+        'Confirmar y agrupar automáticamente',
+        help='Cron cada 2 min: confirma los pedidos DP- y, cuando no queda ninguno, crea las '
+             'agrupaciones y oleadas. Entre semana solo en el horario; sábado y domingo, todo el día.')
+    confirm_from = fields.Float('Confirmar desde (hora)', default=17.0)
+    confirm_to = fields.Float('Confirmar hasta (hora, día siguiente)', default=7.0)
+    confirm_seconds = fields.Integer('Segundos por ejecución (confirmar/agrupar)', default=90)
+    group_size = fields.Integer('Máximo de OUT por agrupación', default=150)
     fetch_from = fields.Float('Buscar desde (hora)', default=12.0)
     fetch_to = fields.Float('Buscar hasta (hora)', default=17.5)
     fetch_every = fields.Integer('Buscar cada (min)', default=30)
@@ -204,6 +218,197 @@ class VpDropshipConfig(models.Model):
                 new |= batch
         return new
 
+    # ------------------------------------------------------------------
+    # Confirmar pedidos DP- i crear agrupacions + oleades (la lògica dels crons 450 i 451)
+    def _in_confirm_window(self):
+        """Entre setmana, de confirm_from fins a confirm_to de l'endemà; dissabte i diumenge, tot el dia."""
+        now = datetime.now(TZ)
+        hhmm = now.strftime('%H:%M')
+        return now.weekday() >= 5 or not (_hhmm(self.confirm_to) <= hhmm < _hhmm(self.confirm_from))
+
+    def _log(self, func, message, level='info'):
+        """Com el log() de les accions de servidor: a Ajustes > Técnico > Registros."""
+        self.env['ir.logging'].sudo().create({
+            'name': 'nath_vp_dropship', 'type': 'server', 'dbname': self.env.cr.dbname,
+            'level': level, 'message': message, 'path': self._name, 'func': func, 'line': str(self.id),
+        })
+
+    def _confirm_step(self, simulate=False):
+        """Confirma pedidos DP- en presupuesto, un a un (commit després de cada un), fins a
+        confirm_seconds. Només els que ja tenen transportista, data d'entrega, modo i plazo de pago
+        (si un pedido del mòdul no té modo de pago, se li posa el de la configuració).
+        Els que han fallat en les últimes 24 h no es tornen a provar."""
+        t0 = time.time()
+        since = fields.Datetime.now() - timedelta(days=1)
+        Logging = self.env['ir.logging'].sudo()
+        pedidos = self.env['sale.order'].search([('name', '=like', 'DP-%'), ('state', 'in', ['draft', 'sent'])],
+                                                order='id')
+        hechos = lineas = 0
+        sin_datos = []
+        for pedido in pedidos:
+            if not simulate and time.time() - t0 > (self.confirm_seconds or 90):
+                break
+            modo = pedido.payment_mode_id or (pedido.dp_batch_id and self.payment_mode_id)
+            if not (pedido.carrier_id and pedido.commitment_date and modo and pedido.payment_term_id):
+                sin_datos.append(pedido.name)
+                continue
+            if Logging.search_count([('func', '=', LOG_CONFIRM), ('message', '=like', pedido.name + ' ERROR%'),
+                                     ('create_date', '>=', since)]):
+                continue   # ja ha fallat en les últimes 24 h
+            if simulate:
+                hechos += 1
+                lineas += len(pedido.order_line)
+                continue
+            nombre = pedido.name
+            t1 = time.time()
+            try:
+                if not pedido.payment_mode_id:
+                    pedido.payment_mode_id = modo
+                pedido.with_context(confirm='yes').action_confirm()
+                self.env.cr.commit()
+                self._log(LOG_CONFIRM, '%s confirmado en %.1f s' % (nombre, time.time() - t1))
+                hechos += 1
+            except Exception as e:
+                self.env.cr.rollback()
+                self.env.clear()
+                self._log(LOG_CONFIRM, '%s ERROR: %s' % (nombre, str(e)[:300]), 'warning')
+                self.env.cr.commit()
+        resumen = 'Ejecucion: %s pedidos %s en %.0f s · %s pendientes · %s sin datos actualizados%s' % (
+            hechos, 'por confirmar (SIMULACION, %s lineas)' % lineas if simulate else 'confirmados',
+            time.time() - t0, len(pedidos) - hechos - len(sin_datos), len(sin_datos),
+            (' (p. ej. %s)' % ', '.join(sin_datos[:5])) if sin_datos else '')
+        if not simulate:
+            self._log(LOG_CONFIRM, resumen)
+            self.env.cr.commit()
+        return resumen
+
+    def _dp_left_to_confirm(self):
+        return self.env['sale.order'].search_count([
+            ('name', '=like', 'DP-%'), ('state', 'in', ['draft', 'sent']),
+            ('carrier_id', '!=', False), ('commitment_date', '!=', False)])
+
+    def _group_step(self, simulate=False):
+        """Agrupacions dels OUT de pedidos DP- reservats, sense agrupació, sense backorder i encara en
+        estoc (no al SORTER), per transportista + data prevista: B-DP_<transportista>_<ddmmaa>
+        (ddmmaa = dia abans de la data prevista = dia del batch), màxim group_size repartits per igual,
+        _1, _2... si n'hi ha més d'una. Després de cada una, «Crear transfer para oleada» (INT al SORTER).
+        Una agrupació cada vegada, amb commit, fins a confirm_seconds."""
+        Picking = self.env['stock.picking']
+        Batch = self.env['stock.picking.batch']
+        max_outs = self.group_size or 150
+        t0 = time.time()
+        por_confirmar = self._dp_left_to_confirm()
+        if por_confirmar and not simulate:
+            return 'Quedan %s pedidos DP por confirmar: todavia no se agrupa.' % por_confirmar
+        outs = Picking.search([
+            ('name', '=like', 'TT/OUT/%'), ('origin', '=like', 'DP-%'), ('state', '=', 'assigned'),
+            ('batch_id', '=', False), ('backorder_id', '=', False),
+            ('location_id.barcode', '!=', 'SORTER'),
+        ], order='id')
+        # com el cron de web/ECI: fora els que ja tenen alguna cosa preparada
+        outs = outs.filtered(lambda p: not p.move_line_ids_without_package.filtered(lambda l: l.qty_done > 0))
+        grupos, orden = {}, []
+        for p in outs:
+            dia = (pytz.utc.localize(p.scheduled_date).astimezone(TZ).date() if p.scheduled_date
+                   else datetime.now(TZ).date())
+            clave = (p.carrier_id.id, dia)
+            if clave not in grupos:
+                grupos[clave] = Picking
+                orden.append(clave)
+            grupos[clave] |= p
+
+        def unidades(pickings):
+            return sum(pickings.mapped('move_lines.product_uom_qty'))
+
+        def nombre_base(pickings, dia):
+            transp = (pickings[0].carrier_id.name or 'SIN_TRANSPORTISTA').replace('Veepee - ', '')
+            transp = transp.replace(' - ', '_').replace(' ', '_')
+            return 'B-DP_%s_%s' % (transp, (dia - timedelta(days=1)).strftime('%d%m%y'))
+
+        def partes(pickings):
+            return -(-len(pickings) // max_outs) or 1
+
+        def siguiente_nombre(base, usados, total_partes):
+            """Una sola agrupació: sense número. Diverses del mateix nom: _1, _2, _3..."""
+            existentes = Batch.search([('name', '=like', base + '%')]).mapped('name') + usados
+            n = len([x for x in existentes if x == base or x.startswith(base + '_')])
+            return base if n == 0 and total_partes == 1 else '%s_%d' % (base, n + 1)
+
+        def primer_trozo(pickings):
+            """Els OUT de la primera agrupació: es reparteix per igual, sense passar de max_outs."""
+            return pickings[:-(-len(pickings) // partes(pickings))]
+
+        lineas, usados = [], []
+        creadas = 0
+        for clave in orden:
+            restantes = grupos[clave]
+            base = nombre_base(restantes, clave[1])
+            while restantes:
+                if not simulate and time.time() - t0 > (self.confirm_seconds or 90):
+                    return 'Agrupaciones creadas: %s (continua en la siguiente ejecucion)' % creadas
+                trozo = primer_trozo(restantes)
+                nombre = siguiente_nombre(base, usados, partes(restantes))
+                if simulate:
+                    usados.append(nombre)
+                    lineas.append('%s: %s OUT, %s u.' % (nombre, len(trozo), int(unidades(trozo))))
+                    restantes -= trozo
+                    continue
+                t1 = time.time()
+                try:
+                    batch = Batch.create({'name': nombre, 'company_id': trozo[0].company_id.id})
+                    trozo.write({'batch_id': batch.id})
+                    Picking.create_transfer_for_batch(trozo)
+                    self.env.cr.commit()
+                    self._log(LOG_GROUP, '%s creada: %s OUT, %s u., oleada en %.0f s' % (
+                        nombre, len(trozo), int(unidades(trozo)), time.time() - t1))
+                    self.env.cr.commit()
+                    creadas += 1
+                    restantes -= trozo
+                except Exception as e:
+                    self.env.cr.rollback()
+                    self.env.clear()
+                    self._log(LOG_GROUP, '%s ERROR: %s' % (nombre, str(e)[:300]), 'warning')
+                    self.env.cr.commit()
+                    return 'Error en %s: %s' % (nombre, str(e)[:300])   # que no ho reintenti en bucle
+        if simulate:
+            return 'SIMULACION agrupaciones DP: %s OUT en %s agrupaciones%s\n%s' % (
+                len(outs), len(lineas),
+                (' (atencion: quedan %s pedidos DP por confirmar)' % por_confirmar) if por_confirmar else '',
+                '\n'.join(lineas) or 'Nada que agrupar.')
+        return 'Agrupaciones creadas: %s' % creadas
+
+    def _confirm_and_group(self):
+        """Una execució: primer confirmar; quan ja no en queda cap per confirmar, agrupar."""
+        self.ensure_one()
+        resumen = self._confirm_step()
+        if not self._dp_left_to_confirm():
+            resumen += '\n' + self._group_step()
+        return resumen
+
+    @api.model
+    def cron_confirm_group(self):
+        """Cron cada 2 minuts (substitueix els crons 450 i 451)."""
+        for config in self.search([('auto_confirm', '=', True)]):
+            if not config._in_confirm_window():
+                continue
+            try:
+                config._confirm_and_group()
+            except Exception as e:
+                self.env.cr.rollback()
+                _logger.exception('VP dropship confirmar/agrupar %s', config.name)
+                config.write({'last_error': str(e)[:2000]})
+                self.env.cr.commit()
+
+    def action_simulate_confirm_group(self):
+        """No canvia res: diu què confirmaria i quines agrupacions faria (a qualsevol hora)."""
+        self.ensure_one()
+        raise UserError('%s\n\n%s' % (self._confirm_step(simulate=True), self._group_step(simulate=True)))
+
+    def action_confirm_group_now(self):
+        """Una execució ara mateix, sense mirar l'horari (com «Ejecutar manualmente» del cron)."""
+        self.ensure_one()
+        raise UserError(self._confirm_and_group())
+
     @api.model
     def cron_run(self):
         """Cron cada 5 minuts: busca batches nous (dins l'horari) i continua creant comandes."""
@@ -300,9 +505,6 @@ class VpDropshipBatch(models.Model):
     n_error = fields.Integer('Con errores', compute='_compute_counts')
     n_pending = fields.Integer('Pendientes', compute='_compute_counts')
     create_job_uuid = fields.Char('Job de creación', readonly=True, copy=False)
-    confirm_job_uuid = fields.Char('Job de confirmación', readonly=True, copy=False)
-    group_job_uuid = fields.Char('Job de agrupaciones', readonly=True, copy=False)
-    n_to_confirm = fields.Integer('Por confirmar', compute='_compute_n_to_confirm')
 
     _sql_constraints = [('batch_uniq', 'unique(config_id, operation_ref, batch_ref)', 'Batch ya descargado.')]
 
@@ -320,11 +522,6 @@ class VpDropshipBatch(models.Model):
             b.n_created = len(lines.filtered(lambda l: l.state in ('created', 'exists')))
             b.n_error = len(lines.filtered(lambda l: l.state == 'error'))
             b.n_pending = len(lines.filtered(lambda l: l.state == 'pending'))
-
-    def _compute_n_to_confirm(self):
-        for b in self:
-            b.n_to_confirm = self.env['sale.order'].search_count(
-                [('dp_batch_id', '=', b.id), ('state', 'in', ('draft', 'sent'))]) if b.id else 0
 
     # ------------------------------------------------------------------
     def _rows(self, api=None):
@@ -502,120 +699,6 @@ class VpDropshipBatch(models.Model):
         if pending:
             self._enqueue_create_orders()
         return _('Creados: %s · pendientes: %s') % (done, pending)
-
-    def _enqueue_confirm_orders(self, skip_ids=None):
-        qjob = self.with_delay(description=_('Veepee DP: confirmar pedidos %s') % self.name
-                               )._job_confirm_orders(skip_ids or [])
-        self.confirm_job_uuid = qjob.uuid
-
-    def action_confirm_orders(self):
-        """Confirma en segon pla els pedidos en esborrany del batch, en lots de JOB_ORDERS."""
-        self.ensure_one()
-        if self._job_running(self.create_job_uuid) or self.n_pending:
-            raise UserError(_('Primero tienen que estar creados todos los pedidos del batch.'))
-        if self._job_running(self.confirm_job_uuid):
-            raise UserError(_('Los pedidos de este batch ya se están confirmando en segundo plano.'))
-        if not self.n_to_confirm:
-            raise UserError(_('No hay pedidos por confirmar en este batch.'))
-        self._enqueue_confirm_orders()
-        self.message_post(body=_('Confirmando %s pedidos en segundo plano (lotes de %s). '
-                                 'Recarga la página para ver el avance.') % (self.n_to_confirm, JOB_ORDERS))
-        return True
-
-    @_as_job
-    def _job_confirm_orders(self, skip_ids):
-        """Un lot: confirma JOB_ORDERS pedidos (commit per pedido) i encua el següent.
-        skip_ids: els que ja han fallat en lots anteriors (no es tornen a provar)."""
-        self.ensure_one()
-        config = self.config_id
-        skip_ids = list(skip_ids or [])
-        SaleOrder = self.env['sale.order']
-        domain = [('dp_batch_id', '=', self.id), ('state', 'in', ('draft', 'sent')), ('id', 'not in', skip_ids)]
-        done = 0
-        for sale in SaleOrder.search(domain, order='id', limit=JOB_ORDERS):
-            try:
-                if config.payment_mode_id and not sale.payment_mode_id:
-                    sale.payment_mode_id = config.payment_mode_id
-                sale.action_confirm()
-                self.env.cr.commit()
-                done += 1
-            except Exception as e:
-                self.env.cr.rollback()
-                self.env.clear()   # que no es reescrigui res del pedido fallit
-                skip_ids.append(sale.id)
-                sale.message_post(body=_('Veepee DP: no se ha podido confirmar: %s') % str(e)[:500])
-                self.env.cr.commit()
-        if SaleOrder.search_count(domain[:2] + [('id', 'not in', skip_ids)]):
-            self._enqueue_confirm_orders(skip_ids)
-        else:
-            failed = SaleOrder.browse(skip_ids).exists().filtered(lambda s: s.state in ('draft', 'sent'))
-            self.message_post(body=_('Confirmación terminada. Sin confirmar por error: %s%s') % (
-                len(failed), (': ' + ', '.join(failed.mapped('name')[:100])) if failed else ''))
-            if config.group_after_confirm and self._pickings_to_group():
-                qjob = self.with_delay(description=_('Veepee DP: agrupaciones %s') % self.name
-                                       )._job_create_groups()
-                self.group_job_uuid = qjob.uuid
-                self.message_post(body=_('Creando las agrupaciones en segundo plano.'))
-        return _('Confirmados: %s · con error en total: %s') % (done, len(skip_ids))
-
-    def _pickings_to_group(self):
-        """Albarans de sortida sense agrupar de les comandes confirmades d'aquest batch,
-        per clau de transportista (ES#ASM), en l'ordre del batch."""
-        by_key = {}
-        for o in self.order_line_ids.filtered(lambda l: l.sale_id.state in ('sale', 'done')):
-            pickings = o.sale_id.picking_ids.filtered(
-                lambda p: p.picking_type_code == 'outgoing' and p.state not in ('done', 'cancel')
-                and not p.batch_id)
-            if pickings:
-                by_key.setdefault(o.carrier_key or 'SIN_TRANSPORTISTA', self.env['stock.picking'])
-                by_key[o.carrier_key or 'SIN_TRANSPORTISTA'] |= pickings
-        return by_key
-
-    def action_create_groups(self):
-        """Crea en segon pla les agrupacions (Batch Transfer) per país + transportista."""
-        self.ensure_one()
-        if self._job_running(self.confirm_job_uuid):
-            raise UserError(_('Espera a que termine la confirmación de los pedidos.'))
-        if self._job_running(self.group_job_uuid):
-            raise UserError(_('Las agrupaciones de este batch ya se están creando en segundo plano.'))
-        n = sum(len(p) for p in self._pickings_to_group().values())
-        if not n:
-            raise UserError(_('No hay albaranes sin agrupar de pedidos confirmados en este batch.'))
-        qjob = self.with_delay(description=_('Veepee DP: agrupaciones %s') % self.name)._job_create_groups()
-        self.group_job_uuid = qjob.uuid
-        self.message_post(body=_('Creando agrupaciones de %s albaranes en segundo plano (máx. %s por agrupación).')
-                          % (n, GROUP_SIZE))
-        return True
-
-    @_as_job
-    def _job_create_groups(self):
-        """Una agrupació cada vegada, amb commit després de cada una (per no bloquejar els crons).
-        Nom: B-DP_<país>_<transportista>_<ddmmaa del batch>[_n]."""
-        self.ensure_one()
-        Batch = self.env['stock.picking.batch']
-        day = (self.batch_date or fields.Date.context_today(self)).strftime('%d%m%y')
-        created, errors = [], []
-        for key, pickings in sorted(self._pickings_to_group().items()):
-            base = 'B-DP_%s_%s' % (key.replace('#', '_').replace(' ', ''), day)
-            chunks = [pickings[i:i + GROUP_SIZE] for i in range(0, len(pickings), GROUP_SIZE)]
-            # si ja n'hi ha d'aquest dia (es torna a llançar), es continua la numeració
-            existing = Batch.search_count([('name', '=like', base + '%')])
-            numbered = len(chunks) > 1 or existing
-            for i, chunk in enumerate(chunks, start=existing + 1):
-                name = '%s_%s' % (base, i) if numbered else base
-                try:
-                    Batch.create({'name': name, 'company_id': self.company_id.id,
-                                  'picking_ids': [(6, 0, chunk.ids)]})
-                    self.env.cr.commit()
-                    created.append('%s (%s)' % (name, len(chunk)))
-                except Exception as e:
-                    self.env.cr.rollback()
-                    self.env.clear()
-                    errors.append('%s: %s' % (name, str(e)[:300]))
-        self.message_post(body=_('Agrupaciones creadas: %s<br/>%s%s') % (
-            len(created), '<br/>'.join(created),
-            ('<br/><b>Con error:</b><br/>' + '<br/>'.join(errors)) if errors else ''))
-        return _('Agrupaciones: %s · con error: %s') % (len(created), len(errors))
 
     def _update_veepee_ids(self, orders):
         """Pas 'Actualització Dropshipping Veepee Product ID': cada variant amb el seu id de Veepee."""

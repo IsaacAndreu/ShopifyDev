@@ -15,5 +15,21 @@
             <field name="doall" eval="False"/>
             <field name="active" eval="False"/>
         </record>
+
+        <!-- Cada 2 min (substitueix els crons 450 i 451): si «Confirmar y agrupar automáticamente»
+             està marcat i és dins l'horari, confirma pedidos DP- i, quan no en queda cap,
+             crea les agrupacions i oleades. Desactivat en instal·lar. -->
+        <record id="cron_vp_dropship_confirm_group" model="ir.cron">
+            <field name="name">Veepee DP: confirmar pedidos y crear agrupaciones y oleadas</field>
+            <field name="model_id" ref="model_vp_dropship_config"/>
+            <field name="state">code</field>
+            <field name="code">model.cron_confirm_group()</field>
+            <field name="user_id" ref="base.user_root"/>
+            <field name="interval_number">2</field>
+            <field name="interval_type">minutes</field>
+            <field name="numbercall">-1</field>
+            <field name="doall" eval="False"/>
+            <field name="active" eval="False"/>
+        </record>
     </data>
 </odoo>
