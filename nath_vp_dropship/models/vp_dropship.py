@@ -25,6 +25,7 @@ def _as_job(func):
 _logger = logging.getLogger(__name__)
 TZ = pytz.timezone('Europe/Madrid')
 JOB_ORDERS = 50          # comandes per lot en segon pla (~2 min, per sota del límit del worker)
+GROUP_SIZE = 150         # albarans per agrupació (Batch Transfer)
 JOB_STALE_MINUTES = 20   # un job 'started' més vell que això és d'abans d'un restart: es pot rellançar
 TARIFA_SELECTION = [('es', 'ES'), ('fr_benelux', 'FR / BENELUX'), ('it', 'IT')]
 # Tarifa per país quan el transportista no és a la taula de mapeig
@@ -297,6 +298,7 @@ class VpDropshipBatch(models.Model):
     n_pending = fields.Integer('Pendientes', compute='_compute_counts')
     create_job_uuid = fields.Char('Job de creación', readonly=True, copy=False)
     confirm_job_uuid = fields.Char('Job de confirmación', readonly=True, copy=False)
+    group_job_uuid = fields.Char('Job de agrupaciones', readonly=True, copy=False)
     n_to_confirm = fields.Integer('Por confirmar', compute='_compute_n_to_confirm')
 
     _sql_constraints = [('batch_uniq', 'unique(config_id, operation_ref, batch_ref)', 'Batch ya descargado.')]
@@ -547,6 +549,65 @@ class VpDropshipBatch(models.Model):
             self.message_post(body=_('Confirmación terminada. Sin confirmar por error: %s%s') % (
                 len(failed), (': ' + ', '.join(failed.mapped('name')[:100])) if failed else ''))
         return _('Confirmados: %s · con error en total: %s') % (done, len(skip_ids))
+
+    def _pickings_to_group(self):
+        """Albarans de sortida sense agrupar de les comandes confirmades d'aquest batch,
+        per clau de transportista (ES#ASM), en l'ordre del batch."""
+        by_key = {}
+        for o in self.order_line_ids.filtered(lambda l: l.sale_id.state in ('sale', 'done')):
+            pickings = o.sale_id.picking_ids.filtered(
+                lambda p: p.picking_type_code == 'outgoing' and p.state not in ('done', 'cancel')
+                and not p.batch_id)
+            if pickings:
+                by_key.setdefault(o.carrier_key or 'SIN_TRANSPORTISTA', self.env['stock.picking'])
+                by_key[o.carrier_key or 'SIN_TRANSPORTISTA'] |= pickings
+        return by_key
+
+    def action_create_groups(self):
+        """Crea en segon pla les agrupacions (Batch Transfer) per país + transportista."""
+        self.ensure_one()
+        if self._job_running(self.confirm_job_uuid):
+            raise UserError(_('Espera a que termine la confirmación de los pedidos.'))
+        if self._job_running(self.group_job_uuid):
+            raise UserError(_('Las agrupaciones de este batch ya se están creando en segundo plano.'))
+        n = sum(len(p) for p in self._pickings_to_group().values())
+        if not n:
+            raise UserError(_('No hay albaranes sin agrupar de pedidos confirmados en este batch.'))
+        qjob = self.with_delay(description=_('Veepee DP: agrupaciones %s') % self.name)._job_create_groups()
+        self.group_job_uuid = qjob.uuid
+        self.message_post(body=_('Creando agrupaciones de %s albaranes en segundo plano (máx. %s por agrupación).')
+                          % (n, GROUP_SIZE))
+        return True
+
+    @_as_job
+    def _job_create_groups(self):
+        """Una agrupació cada vegada, amb commit després de cada una (per no bloquejar els crons).
+        Nom: B-DP_<país>_<transportista>_<ddmmaa del batch>[_n]."""
+        self.ensure_one()
+        Batch = self.env['stock.picking.batch']
+        day = (self.batch_date or fields.Date.context_today(self)).strftime('%d%m%y')
+        created, errors = [], []
+        for key, pickings in sorted(self._pickings_to_group().items()):
+            base = 'B-DP_%s_%s' % (key.replace('#', '_').replace(' ', ''), day)
+            chunks = [pickings[i:i + GROUP_SIZE] for i in range(0, len(pickings), GROUP_SIZE)]
+            # si ja n'hi ha d'aquest dia (es torna a llançar), es continua la numeració
+            existing = Batch.search_count([('name', '=like', base + '%')])
+            numbered = len(chunks) > 1 or existing
+            for i, chunk in enumerate(chunks, start=existing + 1):
+                name = '%s_%s' % (base, i) if numbered else base
+                try:
+                    Batch.create({'name': name, 'company_id': self.company_id.id,
+                                  'picking_ids': [(6, 0, chunk.ids)]})
+                    self.env.cr.commit()
+                    created.append('%s (%s)' % (name, len(chunk)))
+                except Exception as e:
+                    self.env.cr.rollback()
+                    self.env.clear()
+                    errors.append('%s: %s' % (name, str(e)[:300]))
+        self.message_post(body=_('Agrupaciones creadas: %s<br/>%s%s') % (
+            len(created), '<br/>'.join(created),
+            ('<br/><b>Con error:</b><br/>' + '<br/>'.join(errors)) if errors else ''))
+        return _('Agrupaciones: %s · con error: %s') % (len(created), len(errors))
 
     def _update_veepee_ids(self, orders):
         """Pas 'Actualització Dropshipping Veepee Product ID': cada variant amb el seu id de Veepee."""

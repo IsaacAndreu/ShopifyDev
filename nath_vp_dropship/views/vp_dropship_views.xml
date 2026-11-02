@@ -152,6 +152,10 @@
                             confirm="Se confirmarán en segundo plano, por lotes, todos los pedidos en borrador de este batch. ¿Continuar?"
                             attrs="{'invisible': ['|', '|', ('state', 'not in', ('done', 'review')),
                                                   ('n_pending', '!=', 0), ('n_to_confirm', '=', 0)]}"/>
+                    <!-- Agrupacions (Batch Transfer) per país + transportista, una a una en segon pla -->
+                    <button name="action_create_groups" type="object" string="Crear agrupaciones"
+                            confirm="Se crearán en segundo plano las agrupaciones (máx. 150 albaranes) de los pedidos confirmados de este batch. ¿Continuar?"
+                            attrs="{'invisible': ['|', ('state', 'not in', ('done', 'review')), ('n_pending', '!=', 0)]}"/>
                     <!-- Sense botó "Cerrar batch en Veepee": a TUCTUC no es tanquen mai els batches -->
                     <field name="state" widget="statusbar" statusbar_visible="downloaded,creating,done"/>
                 </header>
