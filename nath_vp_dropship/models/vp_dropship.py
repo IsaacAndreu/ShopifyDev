@@ -583,6 +583,9 @@ class VpDropshipBatch(models.Model):
                 continue
             try:
                 sale = SaleOrder.create(self._order_vals(o))
+                # el create (sales_ext) deixa el modo de pago buit (el client no en té): el de la configuració
+                if config.payment_mode_id and sale.payment_mode_id != config.payment_mode_id:
+                    sale.payment_mode_id = config.payment_mode_id
                 o.write({'state': 'created', 'sale_id': sale.id, 'error': False})
                 self.env.cr.commit()
                 done += 1
