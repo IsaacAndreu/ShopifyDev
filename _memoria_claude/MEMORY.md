@@ -4,3 +4,5 @@
 - [Estat nath_shopify_returns](nath-shopify-returns-estat.md) — 1.6.6 a producció, 1.6.7 pendent de desplegar; com es desplega; FedEx/Nacex
 - [Resum 29-30/10](resum-29-30-octubre.md) — returns 1.6.8 a prod, guard FedEx 1.1.0, pilots VP i exchange_billing, acció massiva pendent
 - [ECI Mirakl encallades](eci-mirakl-pedidos-encallats.md) — tandes sense SO, Xapusa CheckStock, cron 453 actiu en real des del 30/10
+- [GitHub ShopifyDev](github-shopifydev.md) — repo privat IsaacAndreu/ShopifyDev; _memoria_claude/ s ha de mantenir al dia
+- [VP devolucions fase 2](vp-returns-fase2.md) — 2.1 preparada (transport, missatge, PROCESSING); 350/346; DEV només articles VP; TT/DEV/0082885 anul·lada

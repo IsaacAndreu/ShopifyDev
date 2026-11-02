@@ -84,3 +84,24 @@ cobreixen sintaxi Python/XML i les proteccions de lectura/importació.
 - **Validació** (no crea res): comanda d'Odoo inequívoca i de la companyia, OUT validats i sense entregues pendents, cada peça a l'OUT amb prou unitats. Si ja hi ha una TT/DEV d'aquests OUT (feta a mà), s'aprofita. Si alguna cosa no quadra: estat *Revisar* amb el motiu.
 - **Crear TT/DEV**: com «Devs masivas ONLINE» i el mòdul Shopify (retorn de l'OUT, `to_refund`), per defecte **amb tota la comanda** (és el que fa la Lorena), a la ubicació configurada. Amb **«Simular TT/DEV»** (per defecte) només escriu al xat el que crearia. Automàtic només si «Crear TT/DEV automáticamente» i sense simular.
 - Encara **no**: transport (Nacex/FedEx), missatge a la clienta, acceptar a VP (`PUT …/PROCESSING`), recepció ni reemborsament.
+
+## Canvis 13.0.0.2.1 — circuit fase 2 (transport, missatge, acceptació, recepció)
+
+Botó **«Procesar»** a la devolució: fa tots els passos seguits. Cada pas queda desat abans del següent; si un falla, la devolució queda a *Revisar* i **«Reintentar»** continua pel pas que faltava, sense repetir res.
+
+1. **TT/DEV** només amb els articles que demana VP («TT/DEV con todo el pedido» desmarcat per defecte). Abans de crear res, totes les peces han d'estar PENDING a VP.
+2. **Etiqueta**, sempre amb els transportistes de la configuració, **mai el de l'OUT** (els OUT de VP de França porten el «Fedex» antic, arxivat):
+   - ES: **eDevoluciones 44 Nacex** (350), eDevolución oberta (`genEtiquetaDevolucion`), com Shopify.
+   - FR: **Fedex Rest** (346), enviament d'importació i **recollida a domicili** l'endemà feiner (horari de «Parámetros de transporte»), amb la instrucció «PREVENIR A L'AVANCE». Si FedEx no accepta la recollida, s'atura (no passa a entrega a punt).
+   - Pes, mides, magatzem de destí i horari: els de la configuració de Devoluciones Shopify («Parámetros de transporte»).
+   - Comandes d'una altra companyia que el transportista (p. ex. MODA INTIMA) → *Revisar*.
+3. **Missatge a la clienta** per PinkConnect (`POST /orders/{id}/notifications`, multipart `subject`, `message`, `attachedFile`) amb l'etiqueta. Textos ES i FR a la configuració (pestanya «Mensajes a la clienta»); el FR porta la data i la franja reals. Si no hi ha resposta, en reintentar es miren els missatges de la comanda (`GET /notifications?orderId=`) abans de tornar-lo a enviar.
+4. **ES:** el registre «Recogida a domicilio» de PinkConnect (Tracking «Entrega a punto», Agencia NACEX) no té API documentada: es fa a mà, es marca «Recogida registrada en VP» i es torna a «Procesar».
+5. **Acceptar a VP**: `PUT /return-requests/{id}/PROCESSING` una per una, rellegint l'estat després de cada una. Mai COMPLETE.
+6. **Recepció**: quan el magatzem valida la TT/DEV, la devolució passa a *Recibida*. **La rectificativa la fa PinkConnect** (en validar una devolució d'una comanda VP posa `auto_invoice_state = waiting` i el seu cron de facturació automàtica la crea): el mòdul no en fa cap.
+
+Amb **«Simular (no crea nada)»** marcat (per defecte), «Procesar» només escriu al xat tot el que faria: TT/DEV, etiqueta, data de recollida, text del missatge i línies que acceptaria.
+
+Després d'actualitzar, a la configuració: «Parámetros de transporte» = TucTuc (Shopify), ES = eDevoluciones 44 Nacex (350), FR = Fedex Rest (346).
+
+Treta la previsualització antiga d'«Artículos VP» (text de la 1.3).

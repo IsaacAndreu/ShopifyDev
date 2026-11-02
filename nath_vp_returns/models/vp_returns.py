@@ -14,6 +14,7 @@ _logger = logging.getLogger(__name__)
 MADRID = pytz.timezone('Europe/Madrid')
 PAGE_SIZE = 50
 OPEN_STATES = ('pending', 'validated', 'review')
+IN_PROGRESS = ('dev_created', 'label', 'notified', 'accepted')
 
 
 class VPReturnConfig(models.Model):
@@ -37,12 +38,12 @@ class VPReturnConfig(models.Model):
         'Crear TT/DEV automáticamente',
         help='Desmarcado: las devoluciones se validan y alguien crea la TT/DEV con el botón.')
     simulate = fields.Boolean(
-        'Simular TT/DEV', default=True,
-        help='No crea la TT/DEV: escribe en el chat lo que crearía.')
+        'Simular (no crea nada)', default=True,
+        help='No crea TT/DEV, transporte ni mensaje, ni acepta en VP: escribe en el chat lo que haría.')
     return_full_order = fields.Boolean(
-        'TT/DEV con todo el pedido', default=True,
-        help='Marcado: como se hace ahora a mano (todas las líneas del OUT). '
-             'Desmarcado: solo los artículos que pide VP.')
+        'TT/DEV con todo el pedido', default=False,
+        help='Desmarcado: solo los artículos que pide VP. '
+             'Marcado: todas las líneas del OUT (la rectificativa de PinkConnect saldría de todas).')
     return_location_id = fields.Many2one(
         'stock.location', 'Ubicación de devolución',
         help='p. ej. WH-OR/Stock/DEVOLUCION_ONLINE')
@@ -62,8 +63,8 @@ class VPReturnConfig(models.Model):
         if need_order and not (self.order_id_filter or '').strip().isdigit():
             raise UserError(_('Introduce el ID numérico interno del pedido PinkConnect.'))
 
-    def _api_get(self, params):
-        """Un sol GET a /return-requests, sense reintents ni redireccions. Mai modifica PinkConnect."""
+    def _pink_base(self):
+        """URL base i capçaleres de la connexió PinkConnect (només l'API oficial HTTPS v4)."""
         connection = self.connection_id
         parts = urlsplit(connection.url or '')
         if (parts.scheme != 'https' or parts.netloc not in
@@ -72,11 +73,15 @@ class VPReturnConfig(models.Model):
             raise UserError(_('La URL debe ser la API oficial HTTPS v4 de PinkConnect.'))
         if not connection.api_key:
             raise UserError(_('Falta la clave en la conexión PinkConnect.'))
+        return connection.url.rstrip('/'), {'Authorization': 'Bearer ' + connection.api_key,
+                                            'Accept': 'application/json'}
+
+    def _api_get(self, params):
+        """Un sol GET a /return-requests, sense reintents ni redireccions. Mai modifica PinkConnect."""
+        base, headers = self._pink_base()
         try:
             response = requests.get(
-                connection.url.rstrip('/') + '/return-requests',
-                headers={'Authorization': 'Bearer ' + connection.api_key,
-                         'Accept': 'application/json'},
+                base + '/return-requests', headers=headers,
                 params=params, timeout=(10, 45), allow_redirects=False)
         except requests.RequestException:
             raise UserError(_('No se ha podido leer PinkConnect. No se ha modificado la plataforma.'))
@@ -193,11 +198,11 @@ class VPReturnConfig(models.Model):
         for order_id in dict.fromkeys(orphans.mapped('order_id')):
             reqs = orphans.filtered(lambda r: r.order_id == order_id)
             ret = Return.search([('config_id', '=', self.id), ('order_id', '=', order_id),
-                                 ('state', 'in', OPEN_STATES + ('dev_created',))], limit=1)
+                                 ('state', 'in', OPEN_STATES + IN_PROGRESS)], limit=1)
             if not ret:
                 ret = Return.create({'config_id': self.id, 'order_id': order_id,
                                      'sale_id': reqs.mapped('sale_id')[:1].id})
-            elif ret.state == 'dev_created':
+            elif ret.state in IN_PROGRESS:
                 # La TT/DEV ja hi és (amb tota la comanda normalment): només s'avisa
                 ret.message_post(body=_('Nuevas solicitudes de VP (%s) para una devolución que ya tiene '
                                         'la TT/DEV %s: revisar si están incluidas.')
@@ -329,34 +334,6 @@ class VPReturnRequest(models.Model):
             order = rec.sale_id.name or rec.order_id
             rec.name = ' · '.join(filter(None, (order, rec.partner_id.name))) or rec.remote_id
 
-    def action_preview(self):
-        self.check_access_rights('write')
-        self.check_access_rule('write')
-        for rec in self:
-            if rec.company_id not in self.env.companies:
-                raise UserError(_('La compañía no está seleccionada.'))
-            country = rec.sale_id.partner_shipping_id.country_id.code
-            if not rec.sale_id:
-                result = _('REVISAR: no hay un pedido Odoo inequívoco para este ID y conexión.')
-            elif rec.remote_status != 'PENDING':
-                result = _('No aceptar: el estado leído no es PENDING.')
-            elif country not in ('ES', 'FR'):
-                result = _('REVISAR: el piloto solo contempla ES y FR.')
-            else:
-                transport = ('Nacex 44, entrega a punto' if country == 'ES'
-                             else "FedEx a domicilio; PREVENIR A L'AVANCE; etiqueta PDF")
-                result = ('SIMULACIÓN — ninguna operación ejecutada.\n'
-                          'Pedido: %s\nTransporte: %s\n'
-                          '1. Validar artículos, cantidades y OUT.\n'
-                          '2. Crear/recuperar TT/DEV y transporte.\n'
-                          '3. Enviar mensaje al cliente.\n'
-                          '4. PUT /return-requests/%s/PROCESSING\n'
-                          '5. Consultar estado y parar si no es PROCESSING.\n'
-                          'Creación de TT/DEV, transporte, mensajes y PUT todavía '
-                          'no habilitados en esta versión piloto.') % (
-                              rec.sale_id.name, transport, rec.remote_id)
-            rec.preview = result
-
 
 class VPReturn(models.Model):
     """Una devolució VP = una comanda de PinkConnect amb les seves sol·licituds (una per peça)."""
@@ -380,6 +357,10 @@ class VPReturn(models.Model):
         ('pending', 'Pendiente'),
         ('validated', 'Validada'),
         ('dev_created', 'TT/DEV creada'),
+        ('label', 'Etiqueta creada'),
+        ('notified', 'Mensaje enviado'),
+        ('accepted', 'Aceptada en VP'),
+        ('received', 'Recibida'),
         ('review', 'Revisar'),
         ('cancel', 'Cancelada'),
     ], default='pending', required=True, readonly=True, tracking=True)
@@ -422,7 +403,7 @@ class VPReturn(models.Model):
         for rec in self:
             try:
                 rec._step_validate()
-                rec.write({'state': 'dev_created' if rec.dev_picking_id else 'validated', 'error_msg': False})
+                rec.write({'state': rec._progress_state(), 'error_msg': False})
             except UserError as e:
                 self.env.cr.rollback()
                 rec.write({'state': 'review', 'error_msg': e.name if hasattr(e, 'name') else str(e)})
@@ -433,21 +414,14 @@ class VPReturn(models.Model):
         return True
 
     def action_process(self):
-        """Valida i crea la TT/DEV (o la simula). Cada devolució fa commit per separat."""
+        """Tot el circuit (vp_flow.py): TT/DEV, etiqueta, missatge i acceptació a VP.
+        Cada pas fet queda desat: si un falla, la devolució queda a Revisar i en reintentar
+        es continua pel pas que faltava, sense repetir els que ja s'han fet."""
         for rec in self:
-            if rec.state in ('dev_created', 'cancel') or not rec._try_lock():
+            if rec.state in ('accepted', 'received', 'cancel') or not rec._try_lock():
                 continue
             try:
-                rec._step_validate()
-                if rec.dev_picking_id:
-                    rec.write({'state': 'dev_created', 'error_msg': False})
-                elif rec.config_id.simulate:
-                    rec.write({'state': 'validated', 'error_msg': False})
-                    rec.message_post(body=_('[SIMULACIÓN] Se crearía la TT/DEV:<br/>%s')
-                                     % (rec.preview or '').replace('\n', '<br/>'))
-                else:
-                    rec._step_create_dev()
-                    rec.write({'state': 'dev_created', 'error_msg': False})
+                rec._run_flow()
             except UserError as e:
                 self.env.cr.rollback()
                 rec.write({'state': 'review', 'error_msg': e.name if hasattr(e, 'name') else str(e)})
@@ -459,6 +433,11 @@ class VPReturn(models.Model):
         return True
 
     def action_cancel(self):
+        for rec in self:
+            if rec.tracking_ref or rec.notification_state != 'none':
+                rec.message_post(body=_('Cancelada con transporte %s y mensaje a VP ya hechos: '
+                                        'anular el envío en el transportista a mano si hace falta.')
+                                 % (rec.tracking_ref or '-'))
         self.write({'state': 'cancel'})
 
     def action_reset(self):

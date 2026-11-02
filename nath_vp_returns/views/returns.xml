@@ -12,7 +12,7 @@
                 <button name="action_import_response" type="object" string="Importar última respuesta"/>
                 <button name="action_import_sample" type="object" string="Importar ejemplo local"/>
             </header><sheet>
-                <div class="alert alert-info">Solo lee de PinkConnect: no acepta solicitudes, no envía mensajes ni crea transporte. Crea la TT/DEV solo si «Simular TT/DEV» está desmarcado.</div>
+                <div class="alert alert-warning">Con «Simular (no crea nada)» desmarcado, «Procesar» en una devolución crea la TT/DEV, la etiqueta (Nacex ES / FedEx FR con recogida), envía el mensaje a la clienta por VP y acepta la devolución en VP. La rectificativa la hace PinkConnect al validar la TT/DEV.</div>
                 <group>
                     <group><field name="name"/><field name="connection_id"/><field name="company_id"/></group>
                     <group><field name="last_fetch"/><field name="last_fetch_result"/></group>
@@ -21,8 +21,16 @@
                     <group string="Automático"><field name="auto_fetch"/><field name="auto_create_dev"/><field name="simulate"/><field name="max_pages"/></group>
                     <group string="TT/DEV"><field name="return_location_id" options="{'no_create': True}"/><field name="return_full_order"/></group>
                 </group>
+                <group string="Transporte">
+                    <group><field name="transport_config_id" options="{'no_create': True}"/></group>
+                    <group><field name="nacex_carrier_id" options="{'no_create': True}"/><field name="fedex_carrier_id" options="{'no_create': True}"/></group>
+                </group>
                 <group string="Una comanda (prueba)"><field name="order_id_filter"/><field name="last_read"/></group>
                 <notebook><page string="Respuesta API"><field name="last_response"/></page>
+                    <page string="Mensajes a la clienta">
+                        <group string="España"><field name="msg_es_subject"/><field name="msg_es_body"/></group>
+                        <group string="Francia"><field name="msg_fr_subject"/><field name="msg_fr_body"/></group>
+                    </page>
                     <page string="Ejemplo local"><field name="sample_response" placeholder='[{"returnRequestId":"TEST-1","orderId":"123","status":"PENDING"}]'/></page>
                 </notebook>
             </sheet></form>
@@ -34,10 +42,10 @@
     </record>
     <record id="request_form" model="ir.ui.view">
         <field name="name">vp.return.request.form</field><field name="model">vp.return.request</field>
-        <field name="arch" type="xml"><form create="false" delete="false"><header><button name="action_preview" type="object" string="Simular / previsualizar" class="oe_highlight"/></header><sheet>
+        <field name="arch" type="xml"><form create="false" delete="false"><sheet>
             <div class="oe_title"><h1><field name="name"/></h1></div>
             <group><group><field name="sale_id"/><field name="partner_id"/><field name="country_id"/><field name="product_id"/><field name="request_date"/></group>
-                <group><field name="remote_status"/><field name="config_id" readonly="1"/><field name="company_id"/><field name="remote_id"/><field name="order_id"/><field name="simulated"/></group></group>
+                <group><field name="remote_status"/><field name="accepted_date"/><field name="config_id" readonly="1"/><field name="company_id"/><field name="remote_id"/><field name="order_id"/><field name="simulated"/></group></group>
             <group string="Datos de la solicitud"><field name="order_line_id"/><field name="marketplace_return_id"/><field name="marketplace_order_number"/><field name="sku"/><field name="gtin"/><field name="return_type"/><field name="reason"/></group>
             <notebook><page string="Previsualización"><field name="preview"/></page><page string="Datos originales"><field name="payload"/></page></notebook>
         </sheet><div class="oe_chatter"><field name="message_follower_ids"/><field name="message_ids"/></div></form></field>
@@ -48,10 +56,10 @@
     <record id="return_tree" model="ir.ui.view">
         <field name="name">vp.return.tree</field><field name="model">vp.return</field>
         <field name="arch" type="xml">
-            <tree create="false" decoration-danger="state == 'review'" decoration-muted="state == 'cancel'" decoration-success="state == 'dev_created'">
+            <tree create="false" decoration-danger="state == 'review'" decoration-muted="state == 'cancel'" decoration-success="state in ('accepted', 'received')" decoration-info="state in ('dev_created', 'label', 'notified')">
                 <field name="request_date"/><field name="sale_id"/><field name="partner_id"/><field name="country_id"/>
                 <field name="n_items"/><field name="remote_status"/><field name="dev_picking_id"/><field name="dev_state" optional="show"/>
-                <field name="state"/><field name="error_msg" optional="show"/><field name="order_id" optional="hide"/><field name="company_id" optional="hide"/>
+                <field name="tracking_ref" optional="show"/><field name="state"/><field name="error_msg" optional="show"/><field name="order_id" optional="hide"/><field name="company_id" optional="hide"/>
             </tree>
         </field>
     </record>
@@ -60,11 +68,14 @@
         <field name="arch" type="xml">
             <form create="false">
                 <header>
-                    <button name="action_process" type="object" string="Crear TT/DEV" class="oe_highlight" states="pending,validated"/>
+                    <button name="action_process" type="object" string="Procesar" class="oe_highlight" states="pending,validated,dev_created,label,notified"
+                            confirm="Crea la TT/DEV y la etiqueta, envía el mensaje a la clienta por VP y acepta la devolución en VP (si «Simular» está desmarcado). ¿Continuar?"/>
                     <button name="action_validate" type="object" string="Volver a validar" states="pending,validated,review"/>
-                    <button name="action_reset" type="object" string="Reintentar" states="review,cancel"/>
-                    <button name="action_cancel" type="object" string="Cancelar" states="pending,validated,review"/>
-                    <field name="state" widget="statusbar" statusbar_visible="pending,validated,dev_created"/>
+                    <button name="action_process" type="object" string="Reintentar" states="review"
+                            confirm="Continúa por el paso que falló, sin repetir lo ya hecho. ¿Continuar?"/>
+                    <button name="action_reset" type="object" string="Volver a pendiente" states="cancel"/>
+                    <button name="action_cancel" type="object" string="Cancelar" states="pending,validated,dev_created,label,notified,review"/>
+                    <field name="state" widget="statusbar" statusbar_visible="validated,dev_created,label,notified,accepted,received"/>
                 </header>
                 <sheet>
                     <div class="oe_title"><h1><field name="name"/></h1></div>
@@ -79,6 +90,16 @@
                                 <tree><field name="product_id"/><field name="quantity"/><field name="reason"/><field name="remote_status"/><field name="return_type" optional="hide"/><field name="remote_id" optional="hide"/></tree>
                             </field>
                         </page>
+                        <page string="Transporte y VP">
+                            <group>
+                                <group><field name="carrier_kind"/><field name="tracking_ref"/><field name="nacex_cod_exp" attrs="{'invisible': [('nacex_cod_exp', '=', False)]}"/>
+                                    <field name="pickup_code" attrs="{'invisible': [('carrier_kind', '!=', 'fedex')]}"/><field name="pickup_date" attrs="{'invisible': [('carrier_kind', '!=', 'fedex')]}"/>
+                                    <field name="label_attachment_id"/></group>
+                                <group><field name="notification_state"/><field name="notification_ref"/>
+                                    <field name="es_pickup_done" attrs="{'readonly': [('state', 'in', ('accepted', 'received', 'cancel'))]}"/>
+                                    <field name="received_date"/></group>
+                            </group>
+                        </page>
                         <page string="Previsualización"><field name="preview"/></page>
                     </notebook>
                 </sheet>
@@ -91,9 +112,9 @@
         <field name="arch" type="xml">
             <search>
                 <field name="name"/><field name="sale_id"/><field name="partner_id"/><field name="dev_picking_id"/><field name="order_id"/>
-                <filter name="todo" string="Por hacer" domain="[('state', 'in', ('pending', 'validated', 'review'))]"/>
+                <filter name="todo" string="Por hacer" domain="[('state', 'in', ('pending', 'validated', 'dev_created', 'label', 'notified', 'review'))]"/>
                 <filter name="review" string="Revisar" domain="[('state', '=', 'review')]"/>
-                <filter name="with_dev" string="Con TT/DEV" domain="[('state', '=', 'dev_created')]"/>
+                <filter name="accepted" string="Aceptadas, esperando el paquete" domain="[('state', '=', 'accepted')]"/>
                 <group expand="0" string="Agrupar por">
                     <filter name="g_state" string="Estado" context="{'group_by': 'state'}"/>
                     <filter name="g_country" string="País" context="{'group_by': 'country_id'}"/>
