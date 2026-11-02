@@ -58,8 +58,8 @@
                                     <field name="payment_mode_id"/>
                                     <field name="payment_term_id"/>
                                     <field name="delivery_days"/>
-                                    <field name="use_price_file"/>
-                                    <!-- Es fa servir la tarifa del client; només per a casos especials -->
+                                    <!-- Comandes a preu 0: la tarifa es posa en acabar la campanya -->
+                                    <field name="use_price_file" invisible="1"/>
                                     <field name="pricelist_es_id" invisible="1"/>
                                     <field name="pricelist_fr_benelux_id" invisible="1"/>
                                     <field name="pricelist_it_id" invisible="1"/>

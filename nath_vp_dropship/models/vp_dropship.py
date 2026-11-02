@@ -472,6 +472,7 @@ class VpDropshipBatch(models.Model):
         lines = json.loads(o.data or '[]')
         Product = self.env['product.product']
         tax_ids = config.tax_ids.ids
+        use_prices = config.use_price_file   # si no: tot a 0, el preu es posa en acabar la campanya
         order_lines = []
         for line in lines:
             product = Product.browse(line['product_id'])
@@ -480,7 +481,7 @@ class VpDropshipBatch(models.Model):
                 'name': product.get_product_multiline_description_sale() or product.display_name,
                 'product_uom_qty': line['qty'],
                 'product_uom': product.uom_id.id,
-                'price_unit': line.get('price') or 0.0,
+                'price_unit': (line.get('price') or 0.0) if use_prices else 0.0,
                 'tax_id': [(6, 0, tax_ids)],
             }))
         local = TZ.localize(datetime.combine(self.batch_date or fields.Date.context_today(self),
