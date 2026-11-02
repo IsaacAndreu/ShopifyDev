@@ -34,6 +34,8 @@ La confirmació, les agrupacions i les oleades les continuen fent els crons 450 
    Després, «Crear agrupaciones» (1.2) fa els Batch Transfer dels albarans de les comandes confirmades
    del batch: un per país + transportista (`B-DP_ES_ASM_<ddmmaa del batch>`), màxim 150 albarans
    (si n'hi ha més: `_1`, `_2`…). Una agrupació cada vegada, amb commit, per no bloquejar els crons.
+   Amb «Agrupar al terminar de confirmar» (per defecte marcat), les agrupacions es fan soles quan acaba
+   «Confirmar pedidos»: un sol clic i ja es pot marxar.
    - primer, el *Dropshipping Veepee Product ID* de cada variant (la part del `Product_Code` abans de `_`);
    - després, una comanda `DP-<orderId>` per cada comanda de Veepee, amb aquestes dades:
      - client, tarifa (ES / FR-BENELUX / IT), preu del fitxer, IVA;

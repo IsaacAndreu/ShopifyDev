@@ -35,6 +35,7 @@
                             </div>
                             <field name="start_date"/>
                             <field name="auto_create"/>
+                            <field name="group_after_confirm"/>
                             <field name="max_seconds"/>
                             <field name="last_fetch"/>
                             <field name="last_error" attrs="{'invisible': [('last_error', '=', False)]}"/>
@@ -149,7 +150,7 @@
                                                   ('n_pending', '=', 0)]}"/>
                     <!-- Confirma en segon pla (queue.job, lots de 50) quan ja estan totes creades -->
                     <button name="action_confirm_orders" type="object" string="Confirmar pedidos" class="btn-primary"
-                            confirm="Se confirmarán en segundo plano, por lotes, todos los pedidos en borrador de este batch. ¿Continuar?"
+                            confirm="Se confirmarán en segundo plano, por lotes, todos los pedidos en borrador de este batch y, al terminar, las agrupaciones (si está marcado en la configuración). ¿Continuar?"
                             attrs="{'invisible': ['|', '|', ('state', 'not in', ('done', 'review')),
                                                   ('n_pending', '!=', 0), ('n_to_confirm', '=', 0)]}"/>
                     <!-- Agrupacions (Batch Transfer) per país + transportista, una a una en segon pla -->

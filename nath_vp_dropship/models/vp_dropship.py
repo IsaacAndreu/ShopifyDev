@@ -54,6 +54,9 @@ class VpDropshipConfig(models.Model):
     auto_fetch = fields.Boolean('Descargar batches automáticamente')
     auto_create = fields.Boolean('Crear pedidos automáticamente',
                                  help='Si no, los pedidos se crean con el botón del batch.')
+    group_after_confirm = fields.Boolean(
+        'Agrupar al terminar de confirmar', default=True,
+        help='Al acabar "Confirmar pedidos" se crean solas las agrupaciones del batch.')
     fetch_from = fields.Float('Buscar desde (hora)', default=12.0)
     fetch_to = fields.Float('Buscar hasta (hora)', default=17.5)
     fetch_every = fields.Integer('Buscar cada (min)', default=30)
@@ -548,6 +551,11 @@ class VpDropshipBatch(models.Model):
             failed = SaleOrder.browse(skip_ids).exists().filtered(lambda s: s.state in ('draft', 'sent'))
             self.message_post(body=_('Confirmación terminada. Sin confirmar por error: %s%s') % (
                 len(failed), (': ' + ', '.join(failed.mapped('name')[:100])) if failed else ''))
+            if config.group_after_confirm and self._pickings_to_group():
+                qjob = self.with_delay(description=_('Veepee DP: agrupaciones %s') % self.name
+                                       )._job_create_groups()
+                self.group_job_uuid = qjob.uuid
+                self.message_post(body=_('Creando las agrupaciones en segundo plano.'))
         return _('Confirmados: %s · con error en total: %s') % (done, len(skip_ids))
 
     def _pickings_to_group(self):
