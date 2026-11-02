@@ -69,7 +69,16 @@ class VpDropshipConfig(models.Model):
              'agrupaciones y oleadas. Entre semana solo en el horario; sábado y domingo, todo el día.')
     confirm_from = fields.Float('Confirmar desde (hora)', default=17.0)
     confirm_to = fields.Float('Confirmar hasta (hora, día siguiente)', default=7.0)
-    confirm_seconds = fields.Integer('Segundos por ejecución (confirmar/agrupar)', default=90)
+    confirm_seconds = fields.Integer('Segundos por ejecución (agrupar)', default=90)
+    confirm_lot_day = fields.Integer('Pedidos por lote (horario de almacén)', default=40)
+    confirm_lot_night = fields.Integer('Pedidos por lote (sin almacén)', default=100)
+    confirm_night_from = fields.Float('Lotes grandes desde (hora)', default=17.0,
+                                      help='Entre semana, desde esta hora hasta "Confirmar hasta".')
+    confirm_action_id = fields.Many2one(
+        'ir.actions.server', 'Acción para confirmar', domain=[('model_id.model', '=', 'sale.order')],
+        default=lambda s: s.env['ir.actions.server'].search(
+            [('name', '=', 'Confirm to Sales Order'), ('model_id.model', '=', 'sale.order')], limit=1),
+        help='La misma que se usa a mano (Acción > Confirm to Sales Order). Vacía: Confirmar estándar.')
     group_size = fields.Integer('Máximo de OUT por agrupación', default=150)
     fetch_from = fields.Float('Buscar desde (hora)', default=12.0)
     fetch_to = fields.Float('Buscar hasta (hora)', default=17.5)
@@ -233,20 +242,39 @@ class VpDropshipConfig(models.Model):
             'level': level, 'message': message, 'path': self._name, 'func': func, 'line': str(self.id),
         })
 
+    def _confirm_lot_size(self):
+        """40 mentre el magatzem treballa (entre setmana fins a confirm_night_from); 100 després i el
+        cap de setmana. Lots més grans no: es guanya molt poc i un error desfà tot el lot."""
+        now = datetime.now(TZ)
+        night = now.weekday() >= 5 or not (_hhmm(self.confirm_to) <= now.strftime('%H:%M')
+                                           < _hhmm(self.confirm_night_from))
+        return (self.confirm_lot_night if night else self.confirm_lot_day) or 40
+
+    def _confirm_records(self, sales):
+        """Com a mà: l'acció «Confirm to Sales Order» (comprovacions de NIF, SEPA i data dels albarans)
+        sobre tot el lot d'una vegada. Sense acció configurada, action_confirm() estàndard."""
+        action = self.confirm_action_id
+        if action:
+            action.with_context(active_model='sale.order', active_ids=sales.ids, active_id=sales[:1].id).run()
+        else:
+            sales.action_confirm()
+
     def _confirm_step(self, simulate=False):
-        """Confirma pedidos DP- en presupuesto, un a un (commit després de cada un), fins a
-        confirm_seconds. Només els que ja tenen transportista, data d'entrega, modo i plazo de pago
-        (si un pedido del mòdul no té modo de pago, se li posa el de la configuració).
-        Els que han fallat en les últimes 24 h no es tornen a provar."""
+        """Confirma UN LOT de pedidos DP- en presupuesto (02/11: un a un amb confirm='yes' anava
+        10 vegades més lent que en lot: 95-180 s contra 8,8 s per pedido). Només els que ja tenen
+        transportista, data d'entrega, modo i plazo de pago (si un pedido del mòdul no té modo de pago,
+        se li posa el de la configuració). Si el lot falla, es desfà i es proven un a un; els que
+        fallen no es tornen a provar fins al cap de 24 h."""
         t0 = time.time()
         since = fields.Datetime.now() - timedelta(days=1)
         Logging = self.env['ir.logging'].sudo()
-        pedidos = self.env['sale.order'].search([('name', '=like', 'DP-%'), ('state', 'in', ['draft', 'sent'])],
-                                                order='id')
-        hechos = lineas = 0
+        SaleOrder = self.env['sale.order']
+        pedidos = SaleOrder.search([('name', '=like', 'DP-%'), ('state', 'in', ['draft', 'sent'])], order='id')
+        size = self._confirm_lot_size()
+        lote = SaleOrder
         sin_datos = []
         for pedido in pedidos:
-            if not simulate and time.time() - t0 > (self.confirm_seconds or 90):
+            if len(lote) >= size:
                 break
             modo = pedido.payment_mode_id or (pedido.dp_batch_id and self.payment_mode_id)
             if not (pedido.carrier_id and pedido.commitment_date and modo and pedido.payment_term_id):
@@ -255,29 +283,51 @@ class VpDropshipConfig(models.Model):
             if Logging.search_count([('func', '=', LOG_CONFIRM), ('message', '=like', pedido.name + ' ERROR%'),
                                      ('create_date', '>=', since)]):
                 continue   # ja ha fallat en les últimes 24 h
-            if simulate:
-                hechos += 1
-                lineas += len(pedido.order_line)
-                continue
-            nombre = pedido.name
+            lote |= pedido
+        hechos = 0
+        if lote and not simulate:
+            ids, nombres = lote.ids, lote.mapped('name')
             t1 = time.time()
             try:
-                if not pedido.payment_mode_id:
-                    pedido.payment_mode_id = modo
-                pedido.with_context(confirm='yes').action_confirm()
+                for pedido in lote.filtered(lambda s: not s.payment_mode_id):
+                    pedido.payment_mode_id = self.payment_mode_id
+                self._confirm_records(lote)
                 self.env.cr.commit()
-                self._log(LOG_CONFIRM, '%s confirmado en %.1f s' % (nombre, time.time() - t1))
-                hechos += 1
+                hechos = len(ids)
+                self._log(LOG_CONFIRM, 'Lote de %s confirmado en %.0f s (%s ... %s)' % (
+                    len(ids), time.time() - t1, nombres[0], nombres[-1]))
             except Exception as e:
                 self.env.cr.rollback()
                 self.env.clear()
-                self._log(LOG_CONFIRM, '%s ERROR: %s' % (nombre, str(e)[:300]), 'warning')
+                self._log(LOG_CONFIRM, 'Lote de %s con error, se confirman uno a uno: %s' % (
+                    len(ids), str(e)[:300]), 'warning')
                 self.env.cr.commit()
-        resumen = 'Ejecucion: %s pedidos %s en %.0f s · %s pendientes · %s sin datos actualizados%s' % (
-            hechos, 'por confirmar (SIMULACION, %s lineas)' % lineas if simulate else 'confirmados',
-            time.time() - t0, len(pedidos) - hechos - len(sin_datos), len(sin_datos),
-            (' (p. ej. %s)' % ', '.join(sin_datos[:5])) if sin_datos else '')
-        if not simulate:
+                for pedido in SaleOrder.browse(ids):
+                    if pedido.state not in ('draft', 'sent'):
+                        continue
+                    nombre = pedido.name
+                    t1 = time.time()
+                    try:
+                        if not pedido.payment_mode_id:
+                            pedido.payment_mode_id = self.payment_mode_id
+                        self._confirm_records(pedido)
+                        self.env.cr.commit()
+                        self._log(LOG_CONFIRM, '%s confirmado en %.1f s' % (nombre, time.time() - t1))
+                        hechos += 1
+                    except Exception as e2:
+                        self.env.cr.rollback()
+                        self.env.clear()
+                        self._log(LOG_CONFIRM, '%s ERROR: %s' % (nombre, str(e2)[:300]), 'warning')
+                    self.env.cr.commit()
+        if simulate:
+            resumen = 'Ejecucion: lote de %s pedidos por confirmar (SIMULACION, %s lineas, lotes de %s) · %s en ' \
+                      'presupuesto · %s sin datos actualizados%s' % (
+                          len(lote), len(lote.mapped('order_line')), size, len(pedidos), len(sin_datos),
+                          (' (p. ej. %s)' % ', '.join(sin_datos[:5])) if sin_datos else '')
+        else:
+            resumen = 'Ejecucion: %s pedidos confirmados en %.0f s · %s pendientes · %s sin datos actualizados%s' % (
+                hechos, time.time() - t0, len(pedidos) - hechos - len(sin_datos), len(sin_datos),
+                (' (p. ej. %s)' % ', '.join(sin_datos[:5])) if sin_datos else '')
             self._log(LOG_CONFIRM, resumen)
             self.env.cr.commit()
         return resumen

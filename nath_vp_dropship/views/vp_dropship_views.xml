@@ -56,6 +56,10 @@
                             </div>
                         </group>
                         <group>
+                            <field name="confirm_action_id"/>
+                            <field name="confirm_lot_day"/>
+                            <field name="confirm_lot_night"/>
+                            <field name="confirm_night_from" widget="float_time"/>
                             <field name="confirm_seconds"/>
                             <field name="group_size"/>
                         </group>
