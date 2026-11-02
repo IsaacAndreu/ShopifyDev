@@ -142,7 +142,9 @@
                             attrs="{'invisible': [('state', 'not in', ('new', 'review'))]}"/>
                     <button name="action_check" type="object" string="Volver a validar"
                             attrs="{'invisible': [('state', 'not in', ('downloaded', 'review'))]}"/>
+                    <!-- Crea totes les pendents en segon pla (queue.job, lots encadenats) -->
                     <button name="action_create_orders" type="object" string="Crear pedidos" class="btn-primary"
+                            confirm="Se crearán todos los pedidos pendientes en segundo plano, por lotes. ¿Continuar?"
                             attrs="{'invisible': ['|', ('state', 'not in', ('downloaded', 'creating', 'review')),
                                                   ('n_pending', '=', 0)]}"/>
                     <!-- Sense botó "Cerrar batch en Veepee": a TUCTUC no es tanquen mai els batches -->

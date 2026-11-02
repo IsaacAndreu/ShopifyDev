@@ -23,7 +23,10 @@ La confirmació, les agrupacions i les oleades les continuen fent els crons 450 
    - si ja existeix una comanda `DP-<n>`, no es crea.
 
    Si hi ha errors, s'envia un correu (des de `no_reply@tuctuc.com`) amb la llista.
-3. **Creació de les comandes**, amb «Crear pedidos automáticamente» o amb el botó del batch:
+3. **Creació de les comandes**, amb «Crear pedidos automáticamente» o amb el botó del batch.
+   El botó «Crear pedidos» (1.2) ho fa tot en segon pla: un `queue.job` crea 50 comandes i n'encua
+   un altre fins que no en queden. Si un restart deixa el job en `started`, al cap de 20 min es pot
+   tornar a prémer el botó. Les comandes es creen en esborrany (no es confirma res).
    - primer, el *Dropshipping Veepee Product ID* de cada variant (la part del `Product_Code` abans de `_`);
    - després, una comanda `DP-<orderId>` per cada comanda de Veepee, amb aquestes dades:
      - client, tarifa (ES / FR-BENELUX / IT), preu del fitxer, IVA;

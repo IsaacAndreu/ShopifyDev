@@ -12,8 +12,20 @@ from odoo.exceptions import UserError
 from . import vp_parse
 from .vp_api import VeepeeApi, VeepeeApiError
 
+try:  # queue_job 13.0.3.x: el decorador encara hi és (deprecated); si algun dia no hi és, no cal
+    from odoo.addons.queue_job.job import job as _job
+except ImportError:
+    _job = None
+
+
+def _as_job(func):
+    return _job(func) if _job else func
+
+
 _logger = logging.getLogger(__name__)
 TZ = pytz.timezone('Europe/Madrid')
+JOB_ORDERS = 50          # comandes per lot en segon pla (~2 min, per sota del límit del worker)
+JOB_STALE_MINUTES = 20   # un job 'started' més vell que això és d'abans d'un restart: es pot rellançar
 TARIFA_SELECTION = [('es', 'ES'), ('fr_benelux', 'FR / BENELUX'), ('it', 'IT')]
 # Tarifa per país quan el transportista no és a la taula de mapeig
 TARIFA_BY_COUNTRY = {'ES': 'es', 'PT': 'es', 'IT': 'it',
@@ -283,6 +295,7 @@ class VpDropshipBatch(models.Model):
     n_created = fields.Integer('Creados', compute='_compute_counts')
     n_error = fields.Integer('Con errores', compute='_compute_counts')
     n_pending = fields.Integer('Pendientes', compute='_compute_counts')
+    create_job_uuid = fields.Char('Job de creación', readonly=True, copy=False)
 
     _sql_constraints = [('batch_uniq', 'unique(config_id, operation_ref, batch_ref)', 'Batch ya descargado.')]
 
@@ -442,11 +455,41 @@ class VpDropshipBatch(models.Model):
             self.state = 'downloaded'
 
     # ------------------------------------------------------------------
+    def _create_job_running(self):
+        """El job de creació encara és viu (pendent, a la cua o en marxa des de fa poc)."""
+        if not self.create_job_uuid:
+            return False
+        qjob = self.env['queue.job'].sudo().search([('uuid', '=', self.create_job_uuid)], limit=1)
+        if qjob.state in ('pending', 'enqueued'):
+            return True
+        return (qjob.state == 'started' and qjob.date_started
+                and qjob.date_started > fields.Datetime.now() - timedelta(minutes=JOB_STALE_MINUTES))
+
+    def _enqueue_create_orders(self):
+        qjob = self.with_delay(description=_('Veepee DP: crear pedidos %s') % self.name)._job_create_orders()
+        self.create_job_uuid = qjob.uuid
+
     def action_create_orders(self):
+        """Crea totes les comandes pendents en segon pla, en lots encadenats de JOB_ORDERS."""
         self.ensure_one()
-        deadline = time.time() + (self.config_id.max_seconds or 240)
-        self._create_orders(deadline)
+        if self._create_job_running():
+            raise UserError(_('Los pedidos de este batch ya se están creando en segundo plano.'))
+        self._enqueue_create_orders()
+        self.message_post(body=_('Creando %s pedidos en segundo plano (lotes de %s). '
+                                 'Recarga la página para ver el avance.') % (self.n_pending, JOB_ORDERS))
         return True
+
+    @_as_job
+    def _job_create_orders(self):
+        self.ensure_one()
+        if self.state not in ('downloaded', 'creating', 'review'):
+            return _('Batch en estado %s: no se crea nada.') % self.state
+        deadline = time.time() + min(self.config_id.max_seconds or 240, 240)
+        done = self._create_orders(deadline, limit=JOB_ORDERS)
+        pending = len(self.order_line_ids.filtered(lambda o: o.state == 'pending'))
+        if pending:
+            self._enqueue_create_orders()
+        return _('Creados: %s · pendientes: %s') % (done, pending)
 
     def _update_veepee_ids(self, orders):
         """Pas 'Actualització Dropshipping Veepee Product ID': cada variant amb el seu id de Veepee."""
@@ -512,8 +555,9 @@ class VpDropshipBatch(models.Model):
         vals.update({k: v for k, v in optional.items() if v})
         return vals
 
-    def _create_orders(self, deadline):
-        """Crea les comandes pendents una a una (commit després de cada una) fins a deadline."""
+    def _create_orders(self, deadline, limit=None):
+        """Crea les comandes pendents una a una (commit després de cada una) fins a deadline
+        o fins a 'limit' comandes."""
         self.ensure_one()
         config = self.config_id
         if not config.partner_id:
@@ -531,7 +575,7 @@ class VpDropshipBatch(models.Model):
         SaleOrder = self.env['sale.order']
         done = failed = 0
         for o in pending:
-            if time.time() > deadline:
+            if time.time() > deadline or (limit and done + failed >= limit):
                 break
             if SaleOrder.search_count([('name', '=', o.name)]):
                 o.write({'state': 'exists', 'sale_id': SaleOrder.search([('name', '=', o.name)], limit=1).id})
