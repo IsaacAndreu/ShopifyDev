@@ -67,25 +67,40 @@ class VpDropshipConfig(models.Model):
         'Confirmar y agrupar automáticamente',
         help='Cron cada 2 min: confirma los pedidos DP- y, cuando no queda ninguno, crea las '
              'agrupaciones y oleadas. Entre semana solo en el horario; sábado y domingo, todo el día.')
-    confirm_from = fields.Float('Confirmar desde (hora)', default=17.0)
+    # 03/11: des de les 11:00 (el batch surt de 11:31 a 12:00); espera que s'hagin creat tots els pedidos
+    confirm_from = fields.Float('Confirmar desde (hora)', default=11.0)
     confirm_to = fields.Float('Confirmar hasta (hora, día siguiente)', default=7.0)
     confirm_seconds = fields.Integer('Segundos por ejecución (agrupar)', default=90)
-    confirm_lot_day = fields.Integer('Pedidos por lote (horario de almacén)', default=40)
+    confirm_lot_day = fields.Integer('Pedidos por lote (horario de almacén)', default=20)
+    confirm_lunch_from = fields.Float('Comida del almacén desde (hora)', default=13.0)
+    confirm_lunch_to = fields.Float('Comida del almacén hasta (hora)', default=13.75)
+    confirm_lot_lunch = fields.Integer('Pedidos por lote (comida del almacén)', default=100,
+                                       help='Lotes que empiezan en la comida (uno de 100 tarda ~13-20 min).')
+    confirm_afternoon_from = fields.Float('Tarde desde (hora)', default=15.0)
+    confirm_lot_afternoon = fields.Integer('Pedidos por lote (tarde)', default=40)
     confirm_lot_night = fields.Integer('Pedidos por lote (sin almacén)', default=100)
     confirm_night_from = fields.Float('Lotes grandes desde (hora)', default=17.0,
                                       help='Entre semana, desde esta hora hasta "Confirmar hasta".')
+    # Oleades (abans cron 451: de 17:00 a 06:00), quan ja no queda cap pedido per crear ni confirmar
+    group_from = fields.Float('Agrupaciones y oleadas desde (hora)', default=17.0)
+    group_to = fields.Float('Agrupaciones y oleadas hasta (hora, día siguiente)', default=6.0)
+    group_int_batch = fields.Boolean(
+        'Agrupar las INT de cada batch', default=True,
+        help='Al acabar las oleadas de un batch, crea una agrupación "<campaña> - <batch>" '
+             '(TTUC86 - 1955391) con todas sus INT al SORTER, como se hacía a mano.')
     confirm_action_id = fields.Many2one(
         'ir.actions.server', 'Acción para confirmar', domain=[('model_id.model', '=', 'sale.order')],
         default=lambda s: s.env['ir.actions.server'].search(
             [('name', '=', 'Confirm to Sales Order'), ('model_id.model', '=', 'sale.order')], limit=1),
         help='La misma que se usa a mano (Acción > Confirm to Sales Order). Vacía: Confirmar estándar.')
     group_size = fields.Integer('Máximo de OUT por agrupación', default=150)
-    fetch_from = fields.Float('Buscar desde (hora)', default=12.0)
+    fetch_from = fields.Float('Buscar desde (hora)', default=11.0)
     fetch_to = fields.Float('Buscar hasta (hora)', default=17.5)
-    fetch_every = fields.Integer('Buscar cada (min)', default=30)
+    fetch_every = fields.Integer('Buscar cada (min)', default=10)
     start_date = fields.Date('Solo batches creados desde', default=fields.Date.context_today,
                              help='Evita descargar los batches antiguos de la campaña la primera vez.')
-    max_seconds = fields.Integer('Segundos por ejecución', default=240,
+    # 03/11: 7200, que es creïn tots d'una (965 en 25 min)
+    max_seconds = fields.Integer('Segundos por ejecución', default=7200,
                                  help='Tiempo máximo creando pedidos en cada ejecución del cron.')
     last_fetch = fields.Datetime('Última búsqueda', readonly=True)
     last_error = fields.Text('Último error', readonly=True)
@@ -235,6 +250,16 @@ class VpDropshipConfig(models.Model):
         hhmm = now.strftime('%H:%M')
         return now.weekday() >= 5 or not (_hhmm(self.confirm_to) <= hhmm < _hhmm(self.confirm_from))
 
+    def _in_group_window(self):
+        """Oleades: entre setmana de group_from fins a group_to de l'endemà; el cap de setmana, tot el dia."""
+        now = datetime.now(TZ)
+        hhmm = now.strftime('%H:%M')
+        return now.weekday() >= 5 or not (_hhmm(self.group_to) <= hhmm < _hhmm(self.group_from))
+
+    def _batches_creating(self):
+        """Batches Veepee que encara estan creant pedidos: fins que no acabin no es confirma ni s'agrupa."""
+        return self.env['vp.dropship.batch'].search_count([('state', 'in', ('downloaded', 'creating'))])
+
     def _log(self, func, message, level='info'):
         """Com el log() de les accions de servidor: a Ajustes > Técnico > Registros."""
         self.env['ir.logging'].sudo().create({
@@ -243,12 +268,19 @@ class VpDropshipConfig(models.Model):
         })
 
     def _confirm_lot_size(self):
-        """40 mentre el magatzem treballa (entre setmana fins a confirm_night_from); 100 després i el
-        cap de setmana. Lots més grans no: es guanya molt poc i un error desfà tot el lot."""
+        """Mida del lot segons l'hora en què comença (entre setmana, 03/11): 20 mentre el magatzem
+        treballa, 100 si comença a la comida (13:00-13:45), 40 a la tarda (15:00) i 100 a partir de
+        confirm_night_from i el cap de setmana. Lots més grans no: es guanya molt poc i un error
+        desfà tot el lot."""
         now = datetime.now(TZ)
-        night = now.weekday() >= 5 or not (_hhmm(self.confirm_to) <= now.strftime('%H:%M')
-                                           < _hhmm(self.confirm_night_from))
-        return (self.confirm_lot_night if night else self.confirm_lot_day) or 40
+        hhmm = now.strftime('%H:%M')
+        if now.weekday() >= 5 or not (_hhmm(self.confirm_to) <= hhmm < _hhmm(self.confirm_night_from)):
+            return self.confirm_lot_night or 100
+        if _hhmm(self.confirm_lunch_from) <= hhmm < _hhmm(self.confirm_lunch_to):
+            return self.confirm_lot_lunch or 100
+        if hhmm >= _hhmm(self.confirm_afternoon_from):
+            return self.confirm_lot_afternoon or 40
+        return self.confirm_lot_day or 20
 
     def _confirm_records(self, sales):
         """Com a mà: l'acció «Confirm to Sales Order» (comprovacions de NIF, SEPA i data dels albarans)
@@ -328,8 +360,9 @@ class VpDropshipConfig(models.Model):
             resumen = 'Ejecucion: %s pedidos confirmados en %.0f s · %s pendientes · %s sin datos actualizados%s' % (
                 hechos, time.time() - t0, len(pedidos) - hechos - len(sin_datos), len(sin_datos),
                 (' (p. ej. %s)' % ', '.join(sin_datos[:5])) if sin_datos else '')
-            self._log(LOG_CONFIRM, resumen)
-            self.env.cr.commit()
+            if pedidos:   # des de les 11:00 cada 2 min: sense res a confirmar no omple Registros
+                self._log(LOG_CONFIRM, resumen)
+                self.env.cr.commit()
         return resumen
 
     def _dp_left_to_confirm(self):
@@ -350,6 +383,9 @@ class VpDropshipConfig(models.Model):
         por_confirmar = self._dp_left_to_confirm()
         if por_confirmar and not simulate:
             return 'Quedan %s pedidos DP por confirmar: todavia no se agrupa.' % por_confirmar
+        por_crear = self._batches_creating()
+        if por_crear and not simulate:
+            return 'Esperando: %s batch(es) Veepee aun creando pedidos: todavia no se agrupa.' % por_crear
         outs = Picking.search([
             ('name', '=like', 'TT/OUT/%'), ('origin', '=like', 'DP-%'), ('state', '=', 'assigned'),
             ('batch_id', '=', False), ('backorder_id', '=', False),
@@ -421,28 +457,96 @@ class VpDropshipConfig(models.Model):
                     self.env.cr.commit()
                     return 'Error en %s: %s' % (nombre, str(e)[:300])   # que no ho reintenti en bucle
         if simulate:
-            return 'SIMULACION agrupaciones DP: %s OUT en %s agrupaciones%s\n%s' % (
+            return 'SIMULACION agrupaciones DP: %s OUT en %s agrupaciones%s\n%s%s' % (
                 len(outs), len(lineas),
                 (' (atencion: quedan %s pedidos DP por confirmar)' % por_confirmar) if por_confirmar else '',
-                '\n'.join(lineas) or 'Nada que agrupar.')
-        return 'Agrupaciones creadas: %s' % creadas
-
-    def _confirm_and_group(self):
-        """Una execució: primer confirmar; quan ja no en queda cap per confirmar, agrupar."""
-        self.ensure_one()
-        resumen = self._confirm_step()
-        if not self._dp_left_to_confirm():
-            resumen += '\n' + self._group_step()
+                '\n'.join(lineas) or 'Nada que agrupar.',
+                ('\n' + self._int_batch_step(simulate=True)) if not outs and self.group_int_batch else '')
+        resumen = 'Agrupaciones creadas: %s' % creadas
+        if not outs and self.group_int_batch:   # ja no queda cap OUT per agrupar
+            resumen += '\n' + self._int_batch_step()
         return resumen
+
+    def _int_batch_step(self, simulate=False):
+        """03/11: quan s'han fet totes les oleades d'un batch Veepee, una agrupació
+        «<campanya> - <batch>» (TTUC86 - 1955391) amb totes les seves INT al SORTER (l'origen de cada INT
+        és el nom de l'agrupació d'OUT), com la feia el magatzem a mà. Si ja n'hi ha una amb aquest nom
+        (feta a mà), s'hi afegeixen les que falten."""
+        Picking = self.env['stock.picking']
+        PickingBatch = self.env['stock.picking.batch']
+        since = fields.Date.context_today(self) - timedelta(days=7)
+        lineas = []
+        for batch in self.env['vp.dropship.batch'].search([
+                ('config_id', '=', self.id), ('state', 'in', ('done', 'review', 'closed')),
+                ('int_batch_id', '=', False), ('batch_date', '>=', since)], order='id'):
+            sales = batch.sale_ids
+            if not sales or sales.filtered(lambda s: s.state in ('draft', 'sent')):
+                continue
+            outs = sales.mapped('picking_ids').filtered(lambda p: p.name.startswith('TT/OUT/'))
+            sin_oleada = outs.filtered(
+                lambda p: p.state == 'assigned' and not p.batch_id and not p.backorder_id
+                and p.location_id.barcode != 'SORTER'
+                and not p.move_line_ids_without_package.filtered(lambda l: l.qty_done > 0))
+            if sin_oleada:
+                continue   # encara li falten oleades
+            agrupaciones = outs.mapped('batch_id.name')
+            if not agrupaciones:
+                continue
+            ints = Picking.search([('name', '=like', 'TT/INT/%'), ('origin', 'in', agrupaciones),
+                                   ('batch_id', '=', False), ('state', 'not in', ('done', 'cancel'))])
+            nombre = '%s - %s' % (batch.operation_code, batch.batch_ref)
+            existente = PickingBatch.search([('name', '=', nombre)], limit=1)
+            if not ints and not existente:
+                continue
+            if simulate:
+                lineas.append('%s: %s INT%s' % (nombre, len(ints), ' (ya existe, se añaden)' if existente else ''))
+                continue
+            try:
+                destino = existente or PickingBatch.create({'name': nombre, 'company_id': batch.company_id.id})
+                ints.write({'batch_id': destino.id})
+                batch.int_batch_id = destino
+                batch.message_post(body=_('Agrupación de las INT: %s (%s INT).') % (nombre, len(destino.picking_ids)))
+                self.env.cr.commit()
+                self._log(LOG_GROUP, '%s %s: %s INT al SORTER' % (
+                    nombre, 'actualizada' if existente else 'creada', len(ints)))
+                self.env.cr.commit()
+                lineas.append(nombre)
+            except Exception as e:
+                self.env.cr.rollback()
+                self.env.clear()
+                self._log(LOG_GROUP, '%s ERROR: %s' % (nombre, str(e)[:300]), 'warning')
+                self.env.cr.commit()
+                lineas.append('Error en %s: %s' % (nombre, str(e)[:300]))
+        if simulate:
+            return 'SIMULACION agrupaciones de INT: %s' % (', '.join(lineas) or 'ninguna')
+        return 'Agrupaciones de INT: %s' % (', '.join(lineas) or 'ninguna')
+
+    def _confirm_and_group(self, check_hours=False):
+        """Una execució: primer confirmar; quan ja no en queda cap per confirmar, agrupar. Res mentre
+        algun batch Veepee encara estigui creant pedidos (03/11), perquè surtin complets. Amb
+        check_hours, cada pas només dins el seu horari (confirmar / agrupacions i oleades)."""
+        self.ensure_one()
+        por_crear = self._batches_creating()
+        if por_crear:
+            resumen = 'Esperando: %s batch(es) Veepee aun creando pedidos' % por_crear
+            self._log(LOG_CONFIRM, resumen)
+            self.env.cr.commit()
+            return resumen
+        resumen = ''
+        if not check_hours or self._in_confirm_window():
+            resumen = self._confirm_step()
+        if (not check_hours or self._in_group_window()) and not self._dp_left_to_confirm():
+            resumen += ('\n' if resumen else '') + self._group_step()
+        return resumen or 'Fuera de horario.'
 
     @api.model
     def cron_confirm_group(self):
         """Cron cada 2 minuts (substitueix els crons 450 i 451)."""
         for config in self.search([('auto_confirm', '=', True)]):
-            if not config._in_confirm_window():
+            if not (config._in_confirm_window() or config._in_group_window()):
                 continue
             try:
-                config._confirm_and_group()
+                config._confirm_and_group(check_hours=True)
             except Exception as e:
                 self.env.cr.rollback()
                 _logger.exception('VP dropship confirmar/agrupar %s', config.name)
@@ -555,6 +659,8 @@ class VpDropshipBatch(models.Model):
     n_error = fields.Integer('Con errores', compute='_compute_counts')
     n_pending = fields.Integer('Pendientes', compute='_compute_counts')
     create_job_uuid = fields.Char('Job de creación', readonly=True, copy=False)
+    int_batch_id = fields.Many2one('stock.picking.batch', 'Agrupación de las INT', readonly=True, copy=False,
+                                   help='"<campaña> - <batch>" con todas las INT al SORTER del batch.')
 
     _sql_constraints = [('batch_uniq', 'unique(config_id, operation_ref, batch_ref)', 'Batch ya descargado.')]
 

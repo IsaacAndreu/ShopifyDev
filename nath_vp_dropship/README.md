@@ -8,7 +8,7 @@ Automatitza el procés diari de Dropshipping Veepee/Privalia. Substitueix:
 - l'importació d'actualització;
 - l'actualització del Dropshipping Veepee Product ID.
 
-La confirmació, les agrupacions i les oleades les continuen fent els crons 450 i 451.
+Des de la 1.2 també fa la confirmació, les agrupacions i les oleades (abans crons 450 i 451). Des de la 1.3 (03/11), tot sol: busca el batch, crea els pedidos, els confirma, fa les oleades i l'agrupació de les INT del batch.
 
 ## Flux
 
@@ -29,17 +29,22 @@ La confirmació, les agrupacions i les oleades les continuen fent els crons 450 
    tornar a prémer el botó. Les comandes es creen en esborrany (no es confirma res).
    **Confirmació, agrupacions i oleades (1.2, abans crons 450 i 451):** amb «Confirmar y agrupar
    automáticamente», el cron «Veepee DP: confirmar pedidos y crear agrupaciones y oleadas» (cada 2 min)
-   fa, entre setmana de 17:00 a 07:00 i el cap de setmana tot el dia:
+   fa, entre setmana de 11:00 a 07:00 i el cap de setmana tot el dia (res mentre algun batch encara estigui creant pedidos):
    - confirma **un lot** de pedidos `DP-` en esborrany per execució amb l'acció «Confirm to Sales
-     Order» (la mateixa d'Acción; NIF, SEPA, data dels albarans): 40 fins a les 17:00 i 100 després i
-     el cap de setmana. Un a un amb `confirm='yes'` anava 10 vegades més lent (02/11: 95–180 s contra
+     Order» (la mateixa d'Acción; NIF, SEPA, data dels albarans). Mida del lot segons l'hora en què
+     comença (1.3): 20, 100 a la comida del magatzem (13:00–13:45), 40 des de les 15:00 i 100 des de
+     les 17:00 i el cap de setmana. Un a un amb `confirm='yes'` anava 10 vegades més lent (02/11: 95–180 s contra
      8,8 s per pedido). Només els que tenen transportista, data, modo i plazo de pago (si un pedido del
      mòdul no té modo de pago, posa el de la configuració). Si el lot falla es desfà i es proven un a
      un; els que fallen no es tornen a provar fins al cap de 24 h;
    - quan no en queda cap per confirmar: agrupacions dels OUT reservats (sense res preparat, no al
      SORTER) per transportista + data prevista, `B-DP_<transportista>_<ddmmaa del batch>`, màxim 150
      repartits per igual (`_1`, `_2`…), i «Crear transfer para oleada» de cada una; una cada vegada,
-     amb commit, per no bloquejar els altres crons.
+     amb commit, per no bloquejar els altres crons. Entre setmana només de 17:00 a 06:00 (camps
+     «Oleadas»);
+   - quan totes les oleades d'un batch estan fetes (1.3): agrupació `<campanya> - <batch>`
+     (`TTUC86 - 1955391`) amb totes les INT al SORTER del batch (l'origen de la INT és el nom de
+     l'agrupació d'OUT), com la feia el magatzem a mà. Si ja n'hi ha una amb aquest nom, s'hi afegeixen.
    Tot queda a *Ajustes → Técnico → Registros* amb els mateixos noms que els crons 450 i 451.
    Botons a la configuració: «Simular confirmación y agrupaciones» (no canvia res) i «Confirmar y
    agrupar ahora» (una execució sense mirar l'horari). **Quan s'activi, desactivar els crons 450 i 451, i posar el cron amb l'usuari IT (ve amb OdooBot).**

@@ -54,14 +54,36 @@
                                 <field name="confirm_to" widget="float_time" class="oe_inline"/>
                                 (día siguiente; sábado y domingo, todo el día)
                             </div>
+                            <label for="group_from" string="Oleadas (entre semana)"/>
+                            <div>
+                                <field name="group_from" widget="float_time" class="oe_inline"/> -
+                                <field name="group_to" widget="float_time" class="oe_inline"/>
+                                (cuando no queda ningún pedido por crear ni por confirmar)
+                            </div>
+                            <field name="group_size"/>
+                            <field name="group_int_batch"/>
+                            <field name="confirm_seconds"/>
                         </group>
-                        <group>
+                        <!-- 03/11: mida del lot segons l'hora en què comença -->
+                        <group string="Pedidos por lote (entre semana)">
                             <field name="confirm_action_id"/>
                             <field name="confirm_lot_day"/>
-                            <field name="confirm_lot_night"/>
-                            <field name="confirm_night_from" widget="float_time"/>
-                            <field name="confirm_seconds"/>
-                            <field name="group_size"/>
+                            <label for="confirm_lunch_from" string="Comida del almacén"/>
+                            <div>
+                                <field name="confirm_lunch_from" widget="float_time" class="oe_inline"/> -
+                                <field name="confirm_lunch_to" widget="float_time" class="oe_inline"/>:
+                                <field name="confirm_lot_lunch" class="oe_inline"/>
+                            </div>
+                            <label for="confirm_afternoon_from" string="Tarde desde"/>
+                            <div>
+                                <field name="confirm_afternoon_from" widget="float_time" class="oe_inline"/>:
+                                <field name="confirm_lot_afternoon" class="oe_inline"/>
+                            </div>
+                            <label for="confirm_night_from" string="Sin almacén desde"/>
+                            <div>
+                                <field name="confirm_night_from" widget="float_time" class="oe_inline"/>:
+                                <field name="confirm_lot_night" class="oe_inline"/> (y el fin de semana)
+                            </div>
                         </group>
                     </group>
                     <notebook>
@@ -189,6 +211,7 @@
                             <field name="batch_ref"/>
                             <field name="batch_date"/>
                             <field name="api_status"/>
+                            <field name="int_batch_id"/>
                         </group>
                         <group>
                             <field name="n_orders"/>

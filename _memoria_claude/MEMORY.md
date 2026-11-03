@@ -6,3 +6,4 @@
 - [ECI Mirakl encallades](eci-mirakl-pedidos-encallats.md) — tandes sense SO, Xapusa CheckStock, cron 453 actiu en real des del 30/10
 - [GitHub ShopifyDev](github-shopifydev.md) — repo privat IsaacAndreu/ShopifyDev; _memoria_claude/ s ha de mantenir al dia
 - [VP devolucions fase 2](vp-returns-fase2.md) — 2.1 preparada (transport, missatge, PROCESSING); 350/346; DEV amb tota la comanda; TT/DEV/0082885 anul·lada
+- [SII UB OSS](sii-ub-oss.md) — 4102 per impostos IE/HU no OSS del connector; duplicat fals en republicar
