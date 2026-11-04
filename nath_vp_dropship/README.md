@@ -40,8 +40,8 @@ Des de la 1.2 també fa la confirmació, les agrupacions i les oleades (abans cr
    - quan no en queda cap per confirmar: agrupacions dels OUT reservats (sense res preparat, no al
      SORTER) per transportista + data prevista, `B-DP_<transportista>_<ddmmaa del batch>`, màxim 150
      repartits per igual (`_1`, `_2`…), i «Crear transfer para oleada» de cada una; una cada vegada,
-     amb commit, per no bloquejar els altres crons. Entre setmana només de 17:00 a 06:00 (camps
-     «Oleadas»);
+     amb commit, per no bloquejar els altres crons. Entre setmana de 11:00 a 06:00 (camps «Oleadas»;
+     03/11: provat amb el magatzem treballant, va bé i ràpid);
    - quan totes les oleades d'un batch estan fetes (1.3): agrupació `<campanya> - <batch>`
      (`TTUC86 - 1955391`) amb totes les INT al SORTER del batch (l'origen de la INT és el nom de
      l'agrupació d'OUT), com la feia el magatzem a mà. Si ja n'hi ha una amb aquest nom, s'hi afegeixen.

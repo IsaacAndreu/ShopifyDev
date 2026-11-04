@@ -81,8 +81,9 @@ class VpDropshipConfig(models.Model):
     confirm_lot_night = fields.Integer('Pedidos por lote (sin almacén)', default=100)
     confirm_night_from = fields.Float('Lotes grandes desde (hora)', default=17.0,
                                       help='Entre semana, desde esta hora hasta "Confirmar hasta".')
-    # Oleades (abans cron 451: de 17:00 a 06:00), quan ja no queda cap pedido per crear ni confirmar
-    group_from = fields.Float('Agrupaciones y oleadas desde (hora)', default=17.0)
+    # Oleades (abans cron 451), quan ja no queda cap pedido per crear ni confirmar. 03/11: des de les
+    # 11:00 (provat amb el magatzem treballant: va bé i ràpid), no cal esperar a les 17:00
+    group_from = fields.Float('Agrupaciones y oleadas desde (hora)', default=11.0)
     group_to = fields.Float('Agrupaciones y oleadas hasta (hora, día siguiente)', default=6.0)
     group_int_batch = fields.Boolean(
         'Agrupar las INT de cada batch', default=True,

@@ -62,12 +62,14 @@ def rows_from_api(batch_json, operation_code, batch_ref):
     orders = batch_json.get('deliveryOrders') if isinstance(batch_json, dict) else batch_json
     rows = []
     for do in orders or []:
-        order_id = _txt(_first(do, 'orderId', 'id'))
+        # 04/11: com l'Excel de VentePriveeSync: PE (nom DP-) i 3a part = id del delivery order (92...),
+        # 4a part = orderId (53...). L'1.1-1.3 els tenia girats i l'app del magatzem donava 404 a Veepee.
+        do_ref = _txt(_first(do, 'id', 'deliveryOrderId', 'reference'))
+        order_id = _txt(_first(do, 'orderId'))
         country = _txt(_first(do, 'country', 'countryCode'))
         carrier_key = _txt(_first(do, 'carrierKey', 'carrier'))
-        do_ref = _txt(_first(do, 'id', 'deliveryOrderId', 'reference'))
         commitment = _txt(_first(do, 'logisticCommitmentDate'))
-        intitule = '#'.join([_txt(operation_code), _txt(batch_ref), order_id, do_ref])
+        intitule = '#'.join([_txt(operation_code), _txt(batch_ref), do_ref, order_id])
         for det in do.get('details') or do.get('lines') or []:
             eans = det.get('ean13List') or []
             if isinstance(eans, str):
@@ -76,7 +78,7 @@ def rows_from_api(batch_json, operation_code, batch_ref):
             product_id = _txt(_first(det, 'productId'))
             supplier_ref = _txt(_first(det, 'supplierReference'))
             rows.append({
-                'PE': order_id,
+                'PE': do_ref,
                 'Style': _txt(det.get('name')),
                 'SIZE': supplier_ref.split('#', 1)[1] if '#' in supplier_ref else '',
                 'Product_Code': '%s_%s' % (product_id, supplier_ref) if product_id else supplier_ref,

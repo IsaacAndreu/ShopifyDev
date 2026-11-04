@@ -134,7 +134,8 @@ orders = {}
 for r in rows:
     parts = r['LI_Intitule'].split('#')
     country, carrier = r['LI_Pays'].split('#', 1)
-    do = orders.setdefault(r['PE'], {'orderId': r['PE'], 'id': parts[3], 'zipCode': r['LI_CodePostal'],
+    # 04/11: a l'Excel PE (3a part) és l'id del delivery order i la 4a part l'orderId
+    do = orders.setdefault(r['PE'], {'id': r['PE'], 'orderId': parts[3], 'zipCode': r['LI_CodePostal'],
                                      'city': r['LI_Ville'], 'country': country, 'carrierKey': carrier,
                                      'details': []})
     pid, sref = r['Product_Code'].split('_', 1)
